@@ -15,6 +15,14 @@ DEFAULT_INSTANCE = {
     "config": {},
 }
 
+SCRIPT_TYPE_BINDINGS = [
+    {
+        "type_key": "MAA",
+        "display_name": "MAA脚本",
+        "script_config_class_name": "MaaConfig",
+    }
+]
+
 
 class Plugin:
     """负责把外部 MAA 运行实现桥接为脚本类型 provider。"""
