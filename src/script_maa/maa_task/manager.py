@@ -28,10 +28,11 @@ from datetime import datetime
 from app.core import Config, EmulatorManager
 from app.models.task import TaskExecuteBase, ScriptItem, UserItem
 from app.models.ConfigBase import MultipleConfig
-from app.models.config import MaaConfig, MaaUserConfig
 from app.services import Notify
 from app.utils import get_logger
 from app.utils.constants import TASK_MODE_ZH
+
+from ..schema import MaaConfig, MaaUserConfig
 from .tools import push_notification
 from .AutoProxy import AutoProxyTask
 from .ManualReview import ManualReviewTask

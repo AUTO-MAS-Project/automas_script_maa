@@ -30,7 +30,6 @@ from datetime import datetime, timedelta
 from app.core import Config
 from app.models.task import TaskExecuteBase, ScriptItem, LogRecord
 from app.models.ConfigBase import MultipleConfig
-from app.models.config import MaaConfig, MaaUserConfig
 from app.models.emulator import DeviceInfo, DeviceBase
 from app.services import Notify, System
 from app.tools import skland_sign_in
@@ -47,6 +46,8 @@ from app.utils.constants import (
     MAA_RUN_MOOD_BOOK,
     MAA_TASK_TRANSITION_METHOD_BOOK,
 )
+
+from ..schema import MaaConfig, MaaUserConfig
 from .tools import push_notification, agree_bilibili, update_maa
 
 logger = get_logger("MAA 自动代理")

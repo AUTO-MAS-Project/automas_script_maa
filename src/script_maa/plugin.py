@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from app.core import Config
 from app.core.script_types import ScriptTypeProvider, script_type_registry
-from app.models.config import MaaConfig, MaaUserConfig
+
+from .schema import MaaConfig, MaaUserConfig, bind_related_config
 
 if TYPE_CHECKING:
     from app.core.plugins import PluginContext
@@ -33,6 +35,7 @@ class Plugin:
     async def on_start(self) -> None:
         from .maa_task.manager import MaaManager
 
+        bind_related_config(Config)
         provider = ScriptTypeProvider(
             type_key="MAA",
             display_name="MAA脚本",

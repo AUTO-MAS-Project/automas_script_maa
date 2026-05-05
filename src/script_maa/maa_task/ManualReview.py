@@ -30,11 +30,12 @@ from datetime import datetime, timedelta
 from app.core import Config, Broadcast
 from app.models.task import TaskExecuteBase, ScriptItem, LogRecord
 from app.models.ConfigBase import MultipleConfig
-from app.models.config import MaaConfig, MaaUserConfig
 from app.models.emulator import DeviceInfo, DeviceBase
 from app.services import System
 from app.utils import get_logger, LogMonitor, ProcessManager
 from app.utils.constants import UTC4, MAA_STARTUP_BASE, ARKNIGHTS_PACKAGE_NAME
+
+from ..schema import MaaConfig, MaaUserConfig
 from .tools import agree_bilibili
 
 logger = get_logger("MAA 人工排查")

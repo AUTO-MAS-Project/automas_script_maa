@@ -22,7 +22,8 @@
 from app.core import Config
 from app.services import Notify
 from app.utils import get_logger
-from app.models.config import MaaUserConfig
+
+from ...schema import MaaUserConfig
 
 logger = get_logger("MAA 通知工具")
 

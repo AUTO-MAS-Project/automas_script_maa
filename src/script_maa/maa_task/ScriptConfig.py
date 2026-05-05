@@ -27,11 +27,12 @@ from pathlib import Path
 from app.core import Config
 from app.models.task import TaskExecuteBase, ScriptItem
 from app.models.ConfigBase import MultipleConfig
-from app.models.config import MaaConfig, MaaUserConfig
 from app.models.emulator import DeviceBase
 from app.services import System
 from app.utils import get_logger, ProcessManager
 from app.utils.constants import MAA_TASKS
+
+from ..schema import MaaConfig, MaaUserConfig
 
 logger = get_logger("MAA 脚本设置")
 
