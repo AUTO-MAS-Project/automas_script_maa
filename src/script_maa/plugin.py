@@ -8,7 +8,7 @@ from app.core.script_types import ScriptTypeProvider, script_type_registry
 from .schema import MaaConfig, MaaUserConfig, bind_related_config
 
 if TYPE_CHECKING:
-    from app.core.plugins import PluginContext
+    from app.plugins import PluginContext
 
 
 DEFAULT_INSTANCE = {
