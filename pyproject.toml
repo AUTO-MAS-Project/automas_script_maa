@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "automas_script_maa"
-version = "0.0.1"
-description = "MAA 脚本桥接插件"
+version = "0.0.2"
+description = "MAA 专项适配"
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.10"
 dependencies = ["pydantic>=2.0"]
