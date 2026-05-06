@@ -32,7 +32,13 @@ class Config(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    reserved: str = PluginField(default="", description="预留字段，当前无需配置")
+    plain_text: str = PluginField(
+        default="请直接在脚本配置使用本插件",
+        title="专项适配",
+        description="请直接在脚本配置使用本插件",
+        min_length=2,
+        max_length=32,
+    )
 
 
 class Webhook(ConfigBase):
