@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-from app import PluginField
+from app.core.plugins.fields import PluginField
 from pydantic import BaseModel, ConfigDict
 
 from app.models.ConfigBase import (
