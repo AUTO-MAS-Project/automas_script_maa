@@ -44,7 +44,7 @@ class Plugin:
             supported_modes=("AutoProxy", "ManualReview", "ScriptConfig"),
             manager_factory=MaaManager,
             icon="MAA",
-            editor_kind="builtin:maa",
+            editor_kind="plugin:script_maa",
         )
         script_type_registry.register(provider, owner=self.ctx.instance_id)
         self.ctx.logger.info("已注册外部 MAA 脚本类型 provider")
