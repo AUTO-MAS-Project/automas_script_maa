@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 import shutil
 import copy
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -12,6 +14,7 @@ from app.models.task import UserItem
 from app.plugins import ScriptAdapterHooks, ScriptAdapterRuntime
 from app.plugins.schema_utils import (
     SchemaDecorationContext,
+    append_schema_field,
     set_schema_field_label,
     set_schema_field_options,
     set_schema_field_state,
@@ -105,6 +108,52 @@ class MaaAdapterHooks(ScriptAdapterHooks):
             help_text="选择多开序号；若列表为空，可保持为“未选择”后由运行时自动处理。",
         )
 
+        set_schema_group_label(schema, "Action", "\u4ea4\u4e92\u64cd\u4f5c")
+        append_schema_field(
+            schema,
+            "Action",
+            {
+                "key": "Action.MAAConfig",
+                "group": "Action",
+                "name": "MAAConfig",
+                "label": "MAA\u914d\u7f6e",
+                "type": "button",
+                "help": "\u542f\u52a8 MAA \u9ed8\u8ba4\u914d\u7f6e\u4f1a\u8bdd\uff0c\u5b8c\u6210\u540e\u70b9\u51fb\u4fdd\u5b58\u914d\u7f6e\u7ed3\u675f\u4f1a\u8bdd\u3002",
+                "button": {
+                    "label": "MAA\u914d\u7f6e",
+                    "path": "/api/dispatch/start",
+                    "method": "POST",
+                    "payload": {
+                        "taskId": "{{scriptId}}",
+                        "mode": "ScriptConfig",
+                    },
+                    "refresh": True,
+                    "session": {
+                        "response_task_id_key": "taskId",
+                        "stop_path": "/api/dispatch/stop",
+                        "stop_method": "POST",
+                        "stop_payload": {
+                            "taskId": "{{session.websocketId}}",
+                        },
+                        "overlay_title": "\u6b63\u5728\u8fdb\u884c MAA \u9ed8\u8ba4\u914d\u7f6e",
+                        "overlay_description": (
+                            "\u5f53\u524d\u6b63\u5728\u542f\u52a8 MAA \u9ed8\u8ba4\u914d\u7f6e\uff0c\u8bf7\u5728 MAA \u7a97\u53e3\u4e2d\u5b8c\u6210\u914d\u7f6e\u3002\n"
+                            "\u914d\u7f6e\u5b8c\u6210\u540e\uff0c\u8bf7\u70b9\u51fb\u201c\u4fdd\u5b58\u914d\u7f6e\u201d\u4ee5\u5199\u56de\u9ed8\u8ba4\u914d\u7f6e\u3002"
+                        ),
+                        "stop_label": "\u4fdd\u5b58\u914d\u7f6e",
+                        "start_message": "\u5df2\u5f00\u59cb {{scriptName}} \u7684 MAA \u9ed8\u8ba4\u914d\u7f6e",
+                        "success_message": "{{scriptName}} \u7684 MAA \u9ed8\u8ba4\u914d\u7f6e\u5df2\u5b8c\u6210",
+                        "stop_message": "{{scriptName}} \u7684 MAA \u9ed8\u8ba4\u914d\u7f6e\u5df2\u4fdd\u5b58",
+                        "timeout_ms": 1800000,
+                        "timeout_auto_stop": True,
+                        "timeout_message": (
+                            "{{scriptName}} \u7684 MAA \u9ed8\u8ba4\u914d\u7f6e\u4f1a\u8bdd\u5df2\u8d85\u65f6\uff0830\u5206\u949f\uff09\uff0c"
+                            "\u6b63\u5728\u81ea\u52a8\u4fdd\u5b58\u914d\u7f6e..."
+                        ),
+                    },
+                },
+            },
+        )
         return schema
 
     async def decorate_user_schema(
@@ -303,12 +352,11 @@ class MaaAdapterHooks(ScriptAdapterHooks):
         return schema
 
     async def check(self, runtime: ScriptAdapterRuntime) -> str:
-        from app.core.config import Config
-
         if runtime.mode not in ("AutoProxy", "ManualReview", "ScriptConfig"):
             return "不支持的任务模式，请检查任务配置！"
 
-        script_config = Config.ScriptConfig[runtime.script_uid]
+        script_config = await runtime.build_script_model()
+        runtime.script_config = script_config
         if not is_script_config_compatible_with_type_key(script_config, "MAA"):
             return "脚本配置类型错误, 不是 MAA 脚本类型"
 
@@ -334,15 +382,18 @@ class MaaAdapterHooks(ScriptAdapterHooks):
         return "Pass"
 
     async def prepare(self, runtime: ScriptAdapterRuntime) -> None:
-        from app.core.config import Config
         from app.core.emulator_manager import EmulatorManager
 
-        script_config = Config.ScriptConfig[runtime.script_uid]
-        await script_config.lock()
+        storage_script_config = runtime.get_storage_script_config()
+        await storage_script_config.lock()
 
+        script_config = runtime.script_config or await runtime.build_script_model()
         runtime.script_config = script_config
         runtime.user_config = MultipleConfig([MaaUserConfig])
-        await runtime.user_config.load(await script_config.UserData.toDict())
+        for user_uid, user_model in await runtime.build_user_models():
+            uid = uuid.UUID(user_uid)
+            runtime.user_config.order.append(uid)
+            runtime.user_config.data[uid] = user_model
         logger.success(f"{runtime.script_info.script_id} 已锁定, MAA 配置提取完成")
 
         maa_set_path = Path(script_config.get("Info", "Path")) / "config"
@@ -429,7 +480,8 @@ class MaaAdapterHooks(ScriptAdapterHooks):
             return
 
         logger.info("MAA 主任务已结束, 开始执行后续操作")
-        await script_config.unlock()
+        storage_script_config = runtime.get_storage_script_config()
+        await storage_script_config.unlock()
         logger.success(f"已解锁脚本配置 {runtime.script_info.script_id}")
 
         if runtime.mode in ("AutoProxy", "ManualReview"):
@@ -437,7 +489,35 @@ class MaaAdapterHooks(ScriptAdapterHooks):
             if emulator_manager is not None:
                 await emulator_manager.close(script_config.get("Emulator", "Index"))
 
-            await script_config.UserData.load(await runtime.user_config.toDict())
+            from app.core.script_config_codec import form_to_storage, storage_to_form
+            from app.models.plugin_script_config import PluginUserConfig
+
+            provider = runtime._resolve_provider()
+            for user_uid, user_model in runtime.user_config.items():
+                storage_user = storage_script_config.UserData[user_uid]
+                if isinstance(storage_user, PluginUserConfig):
+                    user_payload = await user_model.toDict(if_decrypt=False)
+                    storage_payload = await form_to_storage(provider, user_payload, "user")
+                    await storage_user.set(
+                        "PluginData",
+                        "Config",
+                        json.dumps(storage_payload, ensure_ascii=False),
+                    )
+                    form_payload = await storage_to_form(provider, storage_payload, "user")
+                    user_name = form_payload.get("user_name")
+                    if not isinstance(user_name, str) or not user_name.strip():
+                        info = form_payload.get("Info")
+                        user_name = (
+                            info.get("Name")
+                            if isinstance(info, dict) and isinstance(info.get("Name"), str)
+                            else str(user_uid)
+                        )
+                    await storage_user.set("Info", "Name", user_name.strip())
+                else:
+                    await storage_script_config.UserData.load(
+                        await runtime.user_config.toDict()
+                    )
+                    break
 
             error_user = [
                 user.name for user in runtime.script_info.user_list if user.status == "异常"
