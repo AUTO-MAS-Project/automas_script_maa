@@ -21,6 +21,8 @@
 #   Contact: DLmaster_361@163.com
 
 
-from .manager import MaaManager
+from .AutoProxy import AutoProxyTask
+from .ManualReview import ManualReviewTask
+from .ScriptConfig import ScriptConfigTask
 
-__all__ = ["MaaManager"]
+__all__ = ["AutoProxyTask", "ManualReviewTask", "ScriptConfigTask"]
