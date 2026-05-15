@@ -24,6 +24,7 @@ from app.services import Notify
 from app.utils import get_logger
 
 from ...schema import MaaUserConfig
+from ...template_renderer import render_template
 
 logger = get_logger("MAA 通知工具")
 
@@ -47,8 +48,7 @@ async def push_notification(
             f"已完成数: {message['completed_count']}, 未完成数: {message['uncompleted_count']}\n\n"
             f"{message['result']}"
         )
-        template = Config.notify_env.get_template("MAA_result.html")
-        message_html = template.render(message)
+        message_html = render_template("MAA_result.html", message)
         serverchan_message = message_text.replace("\n", "\n\n")
         if Config.get("Notify", "IfSendMail"):
             await Notify.send_mail(
@@ -88,8 +88,7 @@ async def push_notification(
             f"{recruit_text}\n"
             f"{drop_text}"
         )
-        template = Config.notify_env.get_template("MAA_statistics.html")
-        message_html = template.render(message)
+        message_html = render_template("MAA_statistics.html", message)
         serverchan_message = message_text.replace("\n", "\n\n")
         if Config.get("Notify", "IfSendStatistic"):
             if Config.get("Notify", "IfSendMail"):
@@ -141,8 +140,7 @@ async def push_notification(
                     title, f"{message_text}\nAUTO-MAS 敬上", webhook
                 )
     elif mode == "公招六星":
-        template = Config.notify_env.get_template("MAA_six_star.html")
-        message_html = template.render(message)
+        message_html = render_template("MAA_six_star.html", message)
         if Config.get("Notify", "IfSendSixStar"):
             if Config.get("Notify", "IfSendMail"):
                 await Notify.send_mail(

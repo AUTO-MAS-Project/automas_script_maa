@@ -8,10 +8,13 @@ version = "0.0.4"
 description = "MAA 专项适配"
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.10"
-dependencies = ["pydantic>=2.0"]
+dependencies = ["jinja2>=3.1", "pydantic>=2.0"]
 
 [project.entry-points."auto_mas.plugins"]
 script_MAA = "script_maa.plugin:Plugin"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+script_maa = ["templates/*.html"]
