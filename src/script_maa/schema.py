@@ -6,15 +6,53 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.plugins.fields import PluginField
 
-from .constants import MAA_STAGE_KEY, RESOURCE_STAGE_INFO, UTC4, UTC8
+from .constants import MAA_STAGE_KEY, MAA_TASK_OPTIONS, RESOURCE_STAGE_INFO, UTC4, UTC8
 
 
 def _option_values(values: list[str]) -> list[dict[str, str]]:
     return [{"label": value, "value": value} for value in values]
+
+
+_MAA_TASK_ORDER = [str(item["value"]) for item in MAA_TASK_OPTIONS]
+_MAA_TASK_FLAG_ORDER = [
+    ("IfStartUp", "StartUp"),
+    ("IfFight", "Fight"),
+    ("IfInfrast", "Infrast"),
+    ("IfRecruit", "Recruit"),
+    ("IfMall", "Mall"),
+    ("IfAward", "Award"),
+    ("IfRoguelike", "Roguelike"),
+    ("IfReclamation", "Reclamation"),
+]
+
+
+def _normalize_enabled_tasks(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+
+    selected = {str(item) for item in value}
+    normalized: list[str] = []
+    for task in _MAA_TASK_ORDER:
+        if task in selected:
+            normalized.append(task)
+    return normalized
+
+
+def _enabled_tasks_from_legacy_flags(data: dict[str, Any]) -> list[str]:
+    normalized: list[str] = []
+    for legacy_key, task in _MAA_TASK_FLAG_ORDER:
+        if data.get(legacy_key) is True:
+            normalized.append(task)
+    return normalized
+
+
+def _is_task_enabled(config: Any, task: str) -> bool:
+    tasks = _normalize_enabled_tasks(config.get("Task", "EnabledTasks"))
+    return task in tasks
 
 
 def _get_stage_zh(stage: str) -> str:
@@ -125,7 +163,7 @@ def _build_user_tags(config: Any) -> str:
     )
 
     infrast_mode = config.get("Info", "InfrastMode")
-    if config.get("Task", "IfInfrast"):
+    if _is_task_enabled(config, "Infrast"):
         if infrast_mode == "Normal":
             infrast_text = "基建：常规"
         elif infrast_mode == "Rotation":
@@ -409,14 +447,28 @@ class MaaUserInfo(BaseModel):
 
 
 class MaaUserTask(BaseModel):
-    IfStartUp: bool = PluginField(True, title="自动启动")
-    IfFight: bool = PluginField(True, title="理智作战")
-    IfInfrast: bool = PluginField(True, title="基建换班")
-    IfRecruit: bool = PluginField(True, title="公开招募")
-    IfMall: bool = PluginField(True, title="信用收支")
-    IfAward: bool = PluginField(True, title="领取奖励")
-    IfRoguelike: bool = PluginField(False, title="肉鸽")
-    IfReclamation: bool = PluginField(False, title="生息演算")
+    EnabledTasks: list[str] = PluginField(
+        default_factory=lambda: _MAA_TASK_ORDER[:6],
+        title="任务开关",
+        ui_type="multiselect",
+        options=MAA_TASK_OPTIONS,
+        size="1/2",
+        json_schema_extra={"selection_mode": "ordered"},
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _upgrade_legacy_task_flags(cls, value: Any) -> Any:
+        if not isinstance(value, dict):
+            return value
+
+        data = dict(value)
+        enabled_tasks = data.get("EnabledTasks")
+        if enabled_tasks is None:
+            data["EnabledTasks"] = _enabled_tasks_from_legacy_flags(data)
+        else:
+            data["EnabledTasks"] = _normalize_enabled_tasks(enabled_tasks)
+        return data
 
 
 class MaaUserNotify(BaseModel):
