@@ -368,15 +368,13 @@ class MaaUserInfo(BaseModel):
     ] = PluginField(
         "Annihilation",
         title="剿灭设置",
-        options=_option_values(
-            [
-                "Close",
-                "Annihilation",
-                "Chernobog@Annihilation",
-                "LungmenOutskirts@Annihilation",
-                "LungmenDowntown@Annihilation",
-            ]
-        ),
+        options=[
+            {"label": "不使用剿灭", "value": "Close"},
+            {"label": "剿灭", "value": "Annihilation"},
+            {"label": "龙门市区", "value": "LungmenDowntown@Annihilation"},
+            {"label": "龙门外环", "value": "LungmenOutskirts@Annihilation"},
+            {"label": "切尔诺伯格", "value": "Chernobog@Annihilation"},
+        ],
     )
     InfrastMode: Literal["Normal", "Rotation", "Custom"] = PluginField(
         "Normal",
