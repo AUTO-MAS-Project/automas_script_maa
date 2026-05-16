@@ -9,7 +9,8 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.plugins.fields import PluginField
-from app.utils.constants import MAA_STAGE_KEY, RESOURCE_STAGE_INFO, UTC4, UTC8
+
+from .constants import MAA_STAGE_KEY, RESOURCE_STAGE_INFO, UTC4, UTC8
 
 
 def _option_values(values: list[str]) -> list[dict[str, str]]:

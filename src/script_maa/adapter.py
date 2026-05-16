@@ -18,7 +18,8 @@ from app.plugins.schema_utils import (
     set_schema_field_state,
 )
 from app.utils import get_logger
-from app.utils.constants import TASK_MODE_ZH
+
+from .constants import TASK_MODE_ZH
 
 logger = get_logger("MAA 适配")
 
@@ -82,7 +83,7 @@ class MaaAdapterHooks(ScriptAdapterHooks):
         config_data: dict[str, Any],
         ctx: SchemaDecorationContext,
     ) -> dict[str, Any]:
-        set_schema_field_options(schema, "Info.StageMode", await ctx.get_plan_combox())
+        set_schema_field_options(schema, "Stage.StageMode", await ctx.get_plan_combox())
 
         stage_options = await ctx.get_stage_info("User")
         if not isinstance(stage_options, list):
@@ -92,7 +93,7 @@ class MaaAdapterHooks(ScriptAdapterHooks):
             if isinstance(option, dict) and option.get("value") == "-":
                 option["label"] = "不选择"
 
-        for field_key in ("Info.Stage", "Info.Stage_1", "Info.Stage_2", "Info.Stage_3"):
+        for field_key in ("Stage.Stage", "Stage.Stage_1", "Stage.Stage_2", "Stage.Stage_3"):
             set_schema_field_options(
                 schema,
                 field_key,
@@ -107,13 +108,13 @@ class MaaAdapterHooks(ScriptAdapterHooks):
 
         set_schema_field_options(
             schema,
-            "Info.Stage_Remain",
+            "Stage.Stage_Remain",
             stage_remain_options,
             allow_custom=True,
         )
         set_schema_field_state(
             schema,
-            "Info.Stage_Remain",
+            "Stage.Stage_Remain",
             placeholder="选择或输入自定义关卡",
             help_text="选择“不选择”时，将不使用剩余理智关卡。",
         )
@@ -121,17 +122,20 @@ class MaaAdapterHooks(ScriptAdapterHooks):
         info_group = config_data.get("Info")
         if not isinstance(info_group, dict):
             info_group = {}
-        stage_mode = str(info_group.get("StageMode") or "Fixed")
+        stage_group = config_data.get("Stage")
+        if not isinstance(stage_group, dict):
+            stage_group = {}
+        stage_mode = str(stage_group.get("StageMode") or "Fixed")
         if stage_mode != "Fixed":
             plan_help = "当前由计划表控制，请前往计划表修改。"
             for field_key in (
-                "Info.MedicineNumb",
-                "Info.SeriesNumb",
-                "Info.Stage",
-                "Info.Stage_1",
-                "Info.Stage_2",
-                "Info.Stage_3",
-                "Info.Stage_Remain",
+                "Stage.MedicineNumb",
+                "Stage.SeriesNumb",
+                "Stage.Stage",
+                "Stage.Stage_1",
+                "Stage.Stage_2",
+                "Stage.Stage_3",
+                "Stage.Stage_Remain",
             ):
                 set_schema_field_state(
                     schema,

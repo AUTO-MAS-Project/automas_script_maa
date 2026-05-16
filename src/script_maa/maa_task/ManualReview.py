@@ -34,7 +34,8 @@ from app.models.ConfigBase import MultipleConfig
 from app.models.emulator import DeviceInfo, DeviceBase
 from app.services import System
 from app.utils import get_logger, LogMonitor, ProcessManager
-from app.utils.constants import UTC4, MAA_STARTUP_BASE, ARKNIGHTS_PACKAGE_NAME
+
+from ..constants import ARKNIGHTS_PACKAGE_NAME, MAA_STARTUP_BASE, UTC4
 
 from .tools import agree_bilibili
 

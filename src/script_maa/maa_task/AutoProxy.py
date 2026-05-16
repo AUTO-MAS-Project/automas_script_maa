@@ -35,22 +35,30 @@ from app.models.emulator import DeviceInfo, DeviceBase
 from app.services import Notify, System
 from app.tools import skland_sign_in
 from app.utils import get_logger, LogMonitor, ProcessManager
-from app.utils.constants import (
-    UTC4,
-    UTC8,
-    MAA_TASKS,
-    MAA_TASKS_ZH,
-    MAA_STAGE_KEY,
+
+from ..constants import (
+    ARKNIGHTS_PACKAGE_NAME,
     MAA_ANNIHILATION_FIGHT_BASE,
     MAA_REMAIN_FIGHT_BASE,
-    ARKNIGHTS_PACKAGE_NAME,
     MAA_RUN_MOOD_BOOK,
+    MAA_STAGE_KEY,
     MAA_TASK_TRANSITION_METHOD_BOOK,
+    MAA_TASKS,
+    MAA_TASKS_ZH,
+    UTC4,
+    UTC8,
 )
 
 from .tools import push_notification, agree_bilibili, update_maa
 
 logger = get_logger("MAA 自动代理")
+
+
+def _enabled_tasks(config: Any) -> set[str]:
+    tasks = config.get("Task", "EnabledTasks")
+    if not isinstance(tasks, list):
+        return set()
+    return {str(task) for task in tasks}
 
 
 class AutoProxyTask(TaskExecuteBase):
@@ -210,8 +218,9 @@ class AutoProxyTask(TaskExecuteBase):
             self.cur_user_item.status = f"运行 - {MAA_RUN_MOOD_BOOK[self.mode]}"
 
             if self.mode == "Routine":
+                enabled_tasks = _enabled_tasks(self.cur_user_config)
                 self.task_dict = {
-                    task: self.cur_user_config.get("Task", f"If{task}")
+                    task: task in enabled_tasks
                     for task in MAA_TASKS
                 }
             else:  # Annihilation
@@ -441,14 +450,14 @@ class AutoProxyTask(TaskExecuteBase):
             task_set["StartUp"]["AccountName"] = self.cur_user_config.get("Info", "Id")
 
         # 加载关卡号配置
-        if self.cur_user_config.get("Info", "StageMode") == "Fixed":
+        if self.cur_user_config.get("Stage", "StageMode") == "Fixed":
             plan_data = {
-                stage_key: self.cur_user_config.get("Info", stage_key)
+                stage_key: self.cur_user_config.get("Stage", stage_key)
                 for stage_key in MAA_STAGE_KEY
             }
         else:
             plan = Config.PlanConfig[
-                uuid.UUID(self.cur_user_config.get("Info", "StageMode"))
+                uuid.UUID(self.cur_user_config.get("Stage", "StageMode"))
             ]
             plan_data = {
                 stage_key: plan.get_current_info(stage_key).getValue()
@@ -502,7 +511,7 @@ class AutoProxyTask(TaskExecuteBase):
                     Path.cwd()
                     / f"data/{self.script_info.script_id}/{self.cur_user_uid}/Infrastructure/infrastructure.json"
                 )
-                if self.cur_user_config.get("Info", "InfrastIndex") != "-1":
+                if self.cur_user_config.get("Data", "InfrastIndex") != "-1":
                     infrast_path.parent.mkdir(parents=True, exist_ok=True)
                     infrast_path.write_text(
                         self.cur_user_config.get("Data", "CustomInfrast"),
@@ -525,7 +534,7 @@ class AutoProxyTask(TaskExecuteBase):
                         )
                     ]
                     task_set["Infrast"]["PlanSelect"] = int(
-                        self.cur_user_config.get("Info", "InfrastIndex")
+                        self.cur_user_config.get("Data", "InfrastIndex")
                     )
                 else:
                     logger.warning(
@@ -715,12 +724,12 @@ class AutoProxyTask(TaskExecuteBase):
                 self.cur_user_config.get("Data", "ProxyTimes") + 1,
             )
 
-            if self.cur_user_config.get("Info", "InfrastIndex") != "-1":
+            if self.cur_user_config.get("Data", "InfrastIndex") != "-1":
                 await self.cur_user_config.set(
                     "Data",
                     "InfrastIndex",
                     str(
-                        (int(self.cur_user_config.get("Info", "InfrastIndex")) + 1)
+                        (int(self.cur_user_config.get("Data", "InfrastIndex")) + 1)
                         % len(
                             json.loads(
                                 self.cur_user_config.get("Data", "CustomInfrast")
