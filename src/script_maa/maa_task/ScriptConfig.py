@@ -23,6 +23,7 @@ import json
 import asyncio
 import shutil
 from pathlib import Path
+from typing import Any
 
 from app.core import Config
 from app.models.task import TaskExecuteBase, ScriptItem
@@ -32,7 +33,6 @@ from app.services import System
 from app.utils import get_logger, ProcessManager
 from app.utils.constants import MAA_TASKS
 
-from ..schema import MaaConfig, MaaUserConfig
 
 logger = get_logger("MAA 脚本设置")
 
@@ -43,8 +43,8 @@ class ScriptConfigTask(TaskExecuteBase):
     def __init__(
         self,
         script_info: ScriptItem,
-        script_config: MaaConfig,
-        user_config: MultipleConfig[MaaUserConfig],
+        script_config: Any,
+        user_config: MultipleConfig[Any],
         emulator_manager: DeviceBase,
     ):
         super().__init__()

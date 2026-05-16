@@ -26,6 +26,7 @@ import asyncio
 import shutil
 from pathlib import Path
 from datetime import datetime, timedelta
+from typing import Any
 
 from app.core import Config
 from app.models.task import TaskExecuteBase, ScriptItem, LogRecord
@@ -47,7 +48,6 @@ from app.utils.constants import (
     MAA_TASK_TRANSITION_METHOD_BOOK,
 )
 
-from ..schema import MaaConfig, MaaUserConfig
 from .tools import push_notification, agree_bilibili, update_maa
 
 logger = get_logger("MAA 自动代理")
@@ -59,8 +59,8 @@ class AutoProxyTask(TaskExecuteBase):
     def __init__(
         self,
         script_info: ScriptItem,
-        script_config: MaaConfig,
-        user_config: MultipleConfig[MaaUserConfig],
+        script_config: Any,
+        user_config: MultipleConfig[Any],
         emulator_manager: DeviceBase,
     ):
         super().__init__()

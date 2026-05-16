@@ -19,18 +19,19 @@
 
 #   Contact: DLmaster_361@163.com
 
+from typing import Any
+
 from app.core import Config
 from app.services import Notify
 from app.utils import get_logger
 
-from ...schema import MaaUserConfig
 from ...template_renderer import render_template
 
 logger = get_logger("MAA 通知工具")
 
 
 async def push_notification(
-    mode: str, title: str, message: dict, user_config: MaaUserConfig | None
+    mode: str, title: str, message: dict, user_config: Any | None
 ) -> None:
     """通过所有渠道推送通知"""
 
@@ -60,9 +61,6 @@ async def push_notification(
                 f"{serverchan_message}\nAUTO-MAS 敬上",
                 Config.get("Notify", "ServerChanKey"),
             )
-        for webhook in Config.Notify_CustomWebhooks.values():
-            await Notify.WebhookPush(title, f"{message_text}\nAUTO-MAS 敬上", webhook)
-
         # 发送Koishi通知
         if Config.get("Notify", "IfKoishiSupport"):
             await Notify.send_koishi(f"{title}\n\n{message_text}\nAUTO-MAS 敬上")
@@ -101,11 +99,6 @@ async def push_notification(
                     f"{serverchan_message}\nAUTO-MAS 敬上",
                     Config.get("Notify", "ServerChanKey"),
                 )
-            for webhook in Config.Notify_CustomWebhooks.values():
-                await Notify.WebhookPush(
-                    title, f"{message_text}\nAUTO-MAS 敬上", webhook
-                )
-
             # 发送Koishi通知
             if Config.get("Notify", "IfKoishiSupport"):
                 await Notify.send_koishi(f"{title}\n\n{message_text}\nAUTO-MAS 敬上")
@@ -135,10 +128,6 @@ async def push_notification(
                     logger.error(
                         "用户ServerChan密钥为空, 无法发送用户单独的ServerChan通知"
                     )
-            for webhook in user_config.Notify_CustomWebhooks.values():
-                await Notify.WebhookPush(
-                    title, f"{message_text}\nAUTO-MAS 敬上", webhook
-                )
     elif mode == "公招六星":
         message_html = render_template("MAA_six_star.html", message)
         if Config.get("Notify", "IfSendSixStar"):
@@ -152,9 +141,6 @@ async def push_notification(
                     "好羡慕~\nAUTO-MAS 敬上",
                     Config.get("Notify", "ServerChanKey"),
                 )
-            for webhook in Config.Notify_CustomWebhooks.values():
-                await Notify.WebhookPush(title, "好羡慕~\nAUTO-MAS 敬上", webhook)
-
             # 发送Koishi通知
             if Config.get("Notify", "IfKoishiSupport"):
                 await Notify.send_koishi(f"{title}\n\n好羡慕~\nAUTO-MAS 敬上")
@@ -184,5 +170,3 @@ async def push_notification(
                     logger.error(
                         "用户ServerChan密钥为空, 无法发送用户单独的ServerChan通知"
                     )
-            for webhook in user_config.Notify_CustomWebhooks.values():
-                await Notify.WebhookPush(title, "好羡慕~\nAUTO-MAS 敬上", webhook)

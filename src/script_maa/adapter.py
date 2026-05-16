@@ -14,15 +14,11 @@ from app.models.task import UserItem
 from app.plugins import ScriptAdapterHooks, ScriptAdapterRuntime
 from app.plugins.schema_utils import (
     SchemaDecorationContext,
-    append_schema_field,
-    set_schema_field_label,
     set_schema_field_options,
     set_schema_field_state,
-    set_schema_group_label,
 )
 from app.utils import get_logger
 from app.utils.constants import TASK_MODE_ZH
-from .schema import MaaUserConfig
 
 logger = get_logger("MAA 适配")
 
@@ -56,35 +52,6 @@ class MaaAdapterHooks(ScriptAdapterHooks):
         config_data: dict[str, Any],
         ctx: SchemaDecorationContext,
     ) -> dict[str, Any]:
-        group_labels = {
-            "Info": "基础信息",
-            "Emulator": "模拟器设置",
-            "Run": "运行设置",
-        }
-        field_labels = {
-            "Info.Name": "脚本名称",
-            "Info.Path": "MAA 根目录",
-            "Emulator.Id": "模拟器",
-            "Emulator.Index": "多开实例",
-            "Run.TaskTransitionMethod": "任务切换方式",
-            "Run.ProxyTimesLimit": "代理次数限制",
-            "Run.RunTimesLimit": "运行次数限制",
-            "Run.AnnihilationTimeLimit": "剿灭时间限制（分钟）",
-            "Run.RoutineTimeLimit": "日常时间限制（分钟）",
-            "Run.AnnihilationAvoidWaste": "剿灭避免浪费理智",
-        }
-
-        for group_key, label in group_labels.items():
-            set_schema_group_label(schema, group_key, label)
-        for field_key, label in field_labels.items():
-            set_schema_field_label(schema, field_key, label)
-
-        set_schema_field_state(
-            schema,
-            "Info.Path",
-            placeholder="请选择 MAA 的安装目录",
-            size="large",
-        )
         set_schema_field_options(schema, "Emulator.Id", await ctx.get_emulator_combox())
 
         selected_emulator = ""
@@ -107,53 +74,6 @@ class MaaAdapterHooks(ScriptAdapterHooks):
             "Emulator.Index",
             help_text="选择多开序号；若列表为空，可保持为“未选择”后由运行时自动处理。",
         )
-
-        set_schema_group_label(schema, "Action", "\u4ea4\u4e92\u64cd\u4f5c")
-        append_schema_field(
-            schema,
-            "Action",
-            {
-                "key": "Action.MAAConfig",
-                "group": "Action",
-                "name": "MAAConfig",
-                "label": "MAA\u914d\u7f6e",
-                "type": "button",
-                "help": "\u542f\u52a8 MAA \u9ed8\u8ba4\u914d\u7f6e\u4f1a\u8bdd\uff0c\u5b8c\u6210\u540e\u70b9\u51fb\u4fdd\u5b58\u914d\u7f6e\u7ed3\u675f\u4f1a\u8bdd\u3002",
-                "button": {
-                    "label": "MAA\u914d\u7f6e",
-                    "path": "/api/dispatch/start",
-                    "method": "POST",
-                    "payload": {
-                        "taskId": "{{scriptId}}",
-                        "mode": "ScriptConfig",
-                    },
-                    "refresh": True,
-                    "session": {
-                        "response_task_id_key": "taskId",
-                        "stop_path": "/api/dispatch/stop",
-                        "stop_method": "POST",
-                        "stop_payload": {
-                            "taskId": "{{session.websocketId}}",
-                        },
-                        "overlay_title": "\u6b63\u5728\u8fdb\u884c MAA \u9ed8\u8ba4\u914d\u7f6e",
-                        "overlay_description": (
-                            "\u5f53\u524d\u6b63\u5728\u542f\u52a8 MAA \u9ed8\u8ba4\u914d\u7f6e\uff0c\u8bf7\u5728 MAA \u7a97\u53e3\u4e2d\u5b8c\u6210\u914d\u7f6e\u3002\n"
-                            "\u914d\u7f6e\u5b8c\u6210\u540e\uff0c\u8bf7\u70b9\u51fb\u201c\u4fdd\u5b58\u914d\u7f6e\u201d\u4ee5\u5199\u56de\u9ed8\u8ba4\u914d\u7f6e\u3002"
-                        ),
-                        "stop_label": "\u4fdd\u5b58\u914d\u7f6e",
-                        "start_message": "\u5df2\u5f00\u59cb {{scriptName}} \u7684 MAA \u9ed8\u8ba4\u914d\u7f6e",
-                        "success_message": "{{scriptName}} \u7684 MAA \u9ed8\u8ba4\u914d\u7f6e\u5df2\u5b8c\u6210",
-                        "stop_message": "{{scriptName}} \u7684 MAA \u9ed8\u8ba4\u914d\u7f6e\u5df2\u4fdd\u5b58",
-                        "timeout_ms": 1800000,
-                        "timeout_auto_stop": True,
-                        "timeout_message": (
-                            "{{scriptName}} \u7684 MAA \u9ed8\u8ba4\u914d\u7f6e\u4f1a\u8bdd\u5df2\u8d85\u65f6\uff0830\u5206\u949f\uff09\uff0c"
-                            "\u6b63\u5728\u81ea\u52a8\u4fdd\u5b58\u914d\u7f6e..."
-                        ),
-                    },
-                },
-            },
-        )
         return schema
 
     async def decorate_user_schema(
@@ -162,88 +82,7 @@ class MaaAdapterHooks(ScriptAdapterHooks):
         config_data: dict[str, Any],
         ctx: SchemaDecorationContext,
     ) -> dict[str, Any]:
-        group_labels = {
-            "Info": "基础信息",
-            "Task": "任务开关",
-            "Notify": "通知设置",
-            "Data": "运行数据",
-        }
-        field_labels = {
-            "Info.Name": "用户名称",
-            "Info.Id": "用户 ID",
-            "Info.Password": "密码",
-            "Info.Mode": "展示模式",
-            "Info.StageMode": "关卡模式",
-            "Info.Server": "服务器",
-            "Info.Status": "启用用户",
-            "Info.RemainedDay": "剩余天数",
-            "Info.Annihilation": "剿灭设置",
-            "Info.InfrastMode": "基建模式",
-            "Info.InfrastName": "自定义基建名称",
-            "Info.InfrastIndex": "当前班次索引",
-            "Info.Notes": "备注",
-            "Info.MedicineNumb": "吃理智药数量",
-            "Info.SeriesNumb": "连战次数",
-            "Info.Stage": "主关卡",
-            "Info.Stage_1": "备选关卡 1",
-            "Info.Stage_2": "备选关卡 2",
-            "Info.Stage_3": "备选关卡 3",
-            "Info.Stage_Remain": "剩余理智关卡",
-            "Info.IfSkland": "森空岛签到",
-            "Info.SklandToken": "森空岛 Token",
-            "Info.Tag": "用户标签",
-            "Data.LastProxyDate": "上次代理日期",
-            "Data.LastSklandDate": "上次森空岛签到日期",
-            "Data.ProxyTimes": "今日代理次数",
-            "Data.IfPassCheck": "人工排查通过",
-            "Data.CustomInfrast": "自定义基建 JSON",
-            "Data.InfrastIndex": "自定义基建排班",
-            "Task.IfStartUp": "自动启动",
-            "Task.IfFight": "理智作战",
-            "Task.IfInfrast": "基建换班",
-            "Task.IfRecruit": "公开招募",
-            "Task.IfMall": "信用收支",
-            "Task.IfAward": "领取奖励",
-            "Task.IfRoguelike": "肉鸽",
-            "Task.IfReclamation": "生息演算",
-            "Notify.Enabled": "启用通知",
-            "Notify.IfSendStatistic": "发送统计信息",
-            "Notify.IfSendSixStar": "发送高资喜报",
-            "Notify.IfSendMail": "邮件通知",
-            "Notify.ToAddress": "收件邮箱",
-            "Notify.IfServerChan": "Server酱通知",
-            "Notify.ServerChanKey": "Server酱 SENDKEY",
-        }
-
-        for group_key, label in group_labels.items():
-            set_schema_group_label(schema, group_key, label)
-        for field_key, label in field_labels.items():
-            set_schema_field_label(schema, field_key, label)
-
         set_schema_field_options(schema, "Info.StageMode", await ctx.get_plan_combox())
-        set_schema_field_options(
-            schema,
-            "Info.InfrastMode",
-            [
-                {"label": "常规模式", "value": "Normal"},
-                {"label": "一键轮休", "value": "Rotation"},
-                {"label": "自定义基建", "value": "Custom"},
-            ],
-        )
-        set_schema_field_options(
-            schema,
-            "Info.SeriesNumb",
-            [
-                {"label": "AUTO", "value": "0"},
-                {"label": "1", "value": "1"},
-                {"label": "2", "value": "2"},
-                {"label": "3", "value": "3"},
-                {"label": "4", "value": "4"},
-                {"label": "5", "value": "5"},
-                {"label": "6", "value": "6"},
-                {"label": "不切换", "value": "-1"},
-            ],
-        )
 
         stage_options = await ctx.get_stage_info("User")
         if not isinstance(stage_options, list):
@@ -338,17 +177,6 @@ class MaaAdapterHooks(ScriptAdapterHooks):
                 rows=12,
                 size="large",
             )
-
-        set_schema_field_state(
-            schema,
-            "Info.Tag",
-            help_text="运行时自动生成，仅用于展示。",
-        )
-        set_schema_field_state(
-            schema,
-            "Info.InfrastName",
-            help_text="运行时根据自定义基建 JSON 自动解析。",
-        )
         return schema
 
     async def check(self, runtime: ScriptAdapterRuntime) -> str:
@@ -389,7 +217,8 @@ class MaaAdapterHooks(ScriptAdapterHooks):
 
         script_config = runtime.script_config or await runtime.build_script_model()
         runtime.script_config = script_config
-        runtime.user_config = MultipleConfig([MaaUserConfig])
+        provider = runtime._resolve_provider()
+        runtime.user_config = MultipleConfig([provider.user_config_class])
         for user_uid, user_model in await runtime.build_user_models():
             uid = uuid.UUID(user_uid)
             runtime.user_config.order.append(uid)

@@ -3,7 +3,7 @@ from __future__ import annotations
 from app.plugins import ScriptAdapterDefinition, ScriptAdapterPlugin
 
 from .adapter import MaaAdapterHooks
-from .schema import MaaConfig, MaaUserConfig, bind_related_config
+from .schema import MaaConfigModel, MaaUserConfigModel
 
 DEFAULT_INSTANCE = {
     "name": "script_MAA 脚本桥接",
@@ -28,13 +28,18 @@ class Plugin(ScriptAdapterPlugin):
             ScriptAdapterDefinition(
                 type_key="MAA",
                 display_name="MAA脚本",
-                script_config_class=MaaConfig,
-                user_config_class=MaaUserConfig,
                 hooks_factory=MaaAdapterHooks,
+                script_model=MaaConfigModel,
+                user_model=MaaUserConfigModel,
+                script_class_name="MaaConfig",
+                user_class_name="MaaUserConfig",
+                related_bindings={
+                    "EmulatorConfig": "EmulatorConfig",
+                    "PlanConfig": "PlanConfig",
+                },
                 supported_modes=("AutoProxy", "ManualReview", "ScriptConfig"),
                 icon="MAA",
                 editor_kind="plugin:script_maa",
-                bind_related_config=bind_related_config,
                 metadata={"framework": "script_adapter"},
             )
         ]

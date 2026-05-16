@@ -26,6 +26,7 @@ import asyncio
 import shutil
 from pathlib import Path
 from datetime import datetime, timedelta
+from typing import Any
 
 from app.core import Config, Broadcast
 from app.models.task import TaskExecuteBase, ScriptItem, LogRecord
@@ -35,7 +36,6 @@ from app.services import System
 from app.utils import get_logger, LogMonitor, ProcessManager
 from app.utils.constants import UTC4, MAA_STARTUP_BASE, ARKNIGHTS_PACKAGE_NAME
 
-from ..schema import MaaConfig, MaaUserConfig
 from .tools import agree_bilibili
 
 logger = get_logger("MAA 人工排查")
@@ -47,8 +47,8 @@ class ManualReviewTask(TaskExecuteBase):
     def __init__(
         self,
         script_info: ScriptItem,
-        script_config: MaaConfig,
-        user_config: MultipleConfig[MaaUserConfig],
+        script_config: Any,
+        user_config: MultipleConfig[Any],
         emulator_manager: DeviceBase,
     ):
         super().__init__()

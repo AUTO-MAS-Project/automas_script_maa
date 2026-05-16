@@ -4,27 +4,184 @@ import json
 import uuid
 from datetime import datetime
 from pathlib import Path
+from typing import Any, Literal
+
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.plugins.fields import PluginField
-from pydantic import BaseModel, ConfigDict
-
-from app.models.ConfigBase import (
-    BoolValidator,
-    ConfigBase,
-    ConfigItem,
-    DateTimeValidator,
-    EncryptValidator,
-    FolderValidator,
-    JSONValidator,
-    MultipleConfig,
-    MultipleUIDValidator,
-    OptionsValidator,
-    RangeValidator,
-    URLValidator,
-    UserNameValidator,
-    VirtualConfigValidator,
-)
 from app.utils.constants import MAA_STAGE_KEY, RESOURCE_STAGE_INFO, UTC4, UTC8
+
+
+def _option_values(values: list[str]) -> list[dict[str, str]]:
+    return [{"label": value, "value": value} for value in values]
+
+
+def _get_stage_zh(stage: str) -> str:
+    for stage_info in RESOURCE_STAGE_INFO:
+        if stage_info.get("value") == stage:
+            return (
+                stage_info.get("text", stage)
+                .replace("经验-6/5", "经验")
+                .replace("龙门币-6/5", "龙门币")
+                .replace("红票-5", "红票")
+                .replace("技能-5", "技能")
+                .replace("碳-5", "碳")
+            )
+    return stage
+
+
+def _build_infrast_name(config: Any) -> str:
+    if config.get("Info", "InfrastMode") != "Custom":
+        return "未使用自定义基建模式"
+
+    infrast_data = json.loads(config.get("Data", "CustomInfrast"))
+    if (
+        infrast_data.get("title", "文件标题") != "文件标题"
+        and infrast_data.get("description", "文件描述") != "文件描述"
+    ):
+        return f"{infrast_data['title']} - {infrast_data['description']}"
+    if infrast_data.get("title", "文件标题") != "文件标题":
+        return str(infrast_data["title"])
+    if infrast_data.get("id") is not None:
+        return str(infrast_data["id"])
+    return "未命名自定义基建"
+
+
+def _build_infrast_index(config: Any) -> str:
+    if config.get("Info", "InfrastMode") != "Custom":
+        return "-1"
+
+    infrast_data = json.loads(config.get("Data", "CustomInfrast"))
+    if len(infrast_data.get("plans", [])) == 0:
+        return "-1"
+
+    for index, plan in enumerate(infrast_data.get("plans", [])):
+        for period in plan.get("period", []):
+            if (
+                datetime.strptime(period[0], "%H:%M").time()
+                <= datetime.now().time()
+                <= datetime.strptime(period[1], "%H:%M").time()
+            ):
+                return str(index)
+
+    return config.get("Data", "InfrastIndex") or "0"
+
+
+def _build_user_tags(config: Any) -> str:
+    """生成 MAA 用户标签列表。"""
+
+    tags: list[dict[str, str]] = []
+
+    if not config.get("Data", "IfPassCheck"):
+        tags.append({"text": "人工排查未通过", "color": "red"})
+
+    if (
+        datetime.strptime(config.get("Data", "LastProxyDate"), "%Y-%m-%d").date()
+        == datetime.now(tz=UTC4).date()
+    ):
+        tags.append(
+            {
+                "text": f"日常：已代理{config.get('Data', 'ProxyTimes')}次",
+                "color": "green",
+            }
+        )
+    else:
+        tags.append({"text": "日常：未代理", "color": "orange"})
+
+    if config.get("Info", "IfSkland"):
+        if (
+            datetime.strptime(config.get("Data", "LastSklandDate"), "%Y-%m-%d").date()
+            == datetime.now(tz=UTC8).date()
+        ):
+            tags.append({"text": "森空岛：已签到", "color": "green"})
+        else:
+            tags.append({"text": "森空岛：未签到", "color": "orange"})
+    else:
+        tags.append({"text": "森空岛：禁用", "color": "red"})
+
+    remained_day = config.get("Info", "RemainedDay")
+    if remained_day == -1:
+        tag_color = "gold"
+    elif remained_day == 0:
+        tag_color = "red"
+    elif remained_day <= 3:
+        tag_color = "orange"
+    elif remained_day <= 7:
+        tag_color = "yellow"
+    elif remained_day <= 30:
+        tag_color = "blue"
+    else:
+        tag_color = "green"
+    tags.append(
+        {
+            "text": (
+                f"剩余天数：{remained_day}天"
+                if remained_day >= 0
+                else "剩余天数：无期限"
+            ),
+            "color": tag_color,
+        }
+    )
+
+    infrast_mode = config.get("Info", "InfrastMode")
+    if config.get("Task", "IfInfrast"):
+        if infrast_mode == "Normal":
+            infrast_text = "基建：常规"
+        elif infrast_mode == "Rotation":
+            infrast_text = "基建：轮换"
+        elif infrast_mode == "Custom":
+            infrast_name = _build_infrast_name(config)
+            infrast_text = (
+                f"基建：{infrast_name}"
+                if len(infrast_name) < 10
+                else f"基建：{infrast_name[:10]}..."
+            )
+        else:
+            infrast_text = "基建：开启"
+        tags.append({"text": infrast_text, "color": "purple"})
+    else:
+        tags.append({"text": "基建：关闭", "color": "red"})
+
+    plan_data = {
+        stage_key: _get_stage_zh(config.get("Info", stage_key))
+        for stage_key in MAA_STAGE_KEY[2:]
+    }
+    tag_color = "blue"
+    if config.get("Info", "StageMode") != "Fixed":
+        try:
+            plan = config.related_config["PlanConfig"][
+                uuid.UUID(config.get("Info", "StageMode"))
+            ]
+        except Exception:
+            plan = None
+        if hasattr(plan, "get_current_info"):
+            plan_data = {
+                stage_key: _get_stage_zh(plan.get_current_info(stage_key).getValue())
+                for stage_key in MAA_STAGE_KEY[2:]
+            }
+            tag_color = "green"
+
+    tags.append({"text": f"主关卡：{plan_data['Stage']}", "color": tag_color})
+
+    backup_stages = [
+        plan_data[f"Stage_{index}"]
+        for index in range(1, 4)
+        if plan_data[f"Stage_{index}"] != "禁用"
+    ]
+    if backup_stages:
+        tags.append({"text": f"备选：{', '.join(backup_stages)}", "color": tag_color})
+    if plan_data["Stage_Remain"] != "禁用":
+        tags.append({"text": f"剩余：{plan_data['Stage_Remain']}", "color": tag_color})
+
+    notes = config.get("Info", "Notes")
+    tags.append(
+        {
+            "text": f"备注：{notes}" if len(notes) <= 20 else f"备注：{notes[:20]}...",
+            "color": "pink",
+        }
+    )
+
+    return json.dumps(tags, ensure_ascii=False)
 
 
 class Config(BaseModel):
@@ -41,370 +198,287 @@ class Config(BaseModel):
     )
 
 
-class Webhook(ConfigBase):
-    """Webhook 配置。"""
-
-    def __init__(self) -> None:
-        self.Info_Name = ConfigItem("Info", "Name", "新自定义 Webhook 通知")
-        self.Info_Enabled = ConfigItem("Info", "Enabled", True, BoolValidator())
-
-        self.Data_Url = ConfigItem("Data", "Url", "", URLValidator())
-        self.Data_Template = ConfigItem("Data", "Template", "")
-        self.Data_Headers = ConfigItem("Data", "Headers", "{ }", JSONValidator())
-        self.Data_Method = ConfigItem(
-            "Data", "Method", "POST", OptionsValidator(["POST", "GET"])
-        )
-
-        super().__init__()
+class MaaScriptInfo(BaseModel):
+    Name: str = PluginField("新 MAA 脚本", title="脚本名称")
+    Path: str = PluginField(
+        str(Path.cwd()),
+        title="MAA 根目录",
+        ui_type="folder",
+        path_kind="folder",
+        placeholder="请选择 MAA 的安装目录",
+        size="large",
+    )
 
 
-class MaaUserConfig(ConfigBase):
-    """MAA 用户配置。"""
+class MaaScriptEmulator(BaseModel):
+    Id: str = PluginField(
+        "-",
+        title="模拟器",
+        ui_type="related-id",
+        related_config="EmulatorConfig",
+    )
+    Index: str = PluginField(
+        "-",
+        title="多开实例",
+        help="选择多开序号；若列表为空，可保持为“未选择”后由运行时自动处理。",
+    )
 
-    related_config: dict[str, MultipleConfig] = {}
 
-    def __init__(self) -> None:
-        self.Info_Name = ConfigItem("Info", "Name", "新用户", UserNameValidator())
-        self.Info_Id = ConfigItem("Info", "Id", "")
-        self.Info_Password = ConfigItem("Info", "Password", "", EncryptValidator())
-        self.Info_Mode = ConfigItem(
-            "Info", "Mode", "简洁", OptionsValidator(["简洁", "详细"])
-        )
-        self.Info_StageMode = ConfigItem(
-            "Info",
-            "StageMode",
-            "Fixed",
-            MultipleUIDValidator("Fixed", self.related_config, "PlanConfig"),
-        )
-        self.Info_Server = ConfigItem(
-            "Info",
-            "Server",
+class MaaScriptRun(BaseModel):
+    TaskTransitionMethod: Literal["NoAction", "ExitGame", "ExitEmulator"] = PluginField(
+        "ExitEmulator",
+        title="任务切换方式",
+        options=_option_values(["NoAction", "ExitGame", "ExitEmulator"]),
+    )
+    ProxyTimesLimit: int = PluginField(0, title="代理次数限制", ge=0, le=9999, step=1)
+    RunTimesLimit: int = PluginField(3, title="运行次数限制", ge=1, le=9999, step=1)
+    AnnihilationTimeLimit: int = PluginField(
+        40,
+        title="剿灭时间限制（分钟）",
+        ge=1,
+        le=9999,
+        step=1,
+    )
+    RoutineTimeLimit: int = PluginField(
+        10,
+        title="日常时间限制（分钟）",
+        ge=1,
+        le=9999,
+        step=1,
+    )
+    AnnihilationAvoidWaste: bool = PluginField(False, title="剿灭避免浪费理智")
+
+
+class MaaScriptAction(BaseModel):
+    MAAConfig: str = PluginField(
+        "",
+        title="MAA配置",
+        ui_type="button",
+        configurable=False,
+        help="启动 MAA 默认配置会话，完成后点击保存配置结束会话。",
+        button={
+            "label": "MAA配置",
+            "path": "/api/dispatch/start",
+            "method": "POST",
+            "payload": {"taskId": "{{scriptId}}", "mode": "ScriptConfig"},
+            "refresh": True,
+            "session": {
+                "response_task_id_key": "taskId",
+                "stop_path": "/api/dispatch/stop",
+                "stop_method": "POST",
+                "stop_payload": {"taskId": "{{session.websocketId}}"},
+                "overlay_title": "正在进行 MAA 默认配置",
+                "overlay_description": (
+                    "当前正在启动 MAA 默认配置，请在 MAA 窗口中完成配置。\n"
+                    "配置完成后，请点击“保存配置”以写回默认配置。"
+                ),
+                "stop_label": "保存配置",
+                "start_message": "已开始 {{scriptName}} 的 MAA 默认配置",
+                "success_message": "{{scriptName}} 的 MAA 默认配置已完成",
+                "stop_message": "{{scriptName}} 的 MAA 默认配置已保存",
+                "timeout_ms": 1800000,
+                "timeout_auto_stop": True,
+                "timeout_message": (
+                    "{{scriptName}} 的 MAA 默认配置会话已超时（30分钟），正在自动保存配置..."
+                ),
+            },
+        },
+    )
+
+
+class MaaConfigModel(BaseModel):
+    Info: MaaScriptInfo = Field(default_factory=MaaScriptInfo, title="基础信息")
+    Emulator: MaaScriptEmulator = Field(default_factory=MaaScriptEmulator, title="模拟器设置")
+    Run: MaaScriptRun = Field(default_factory=MaaScriptRun, title="运行设置")
+    Action: MaaScriptAction = Field(default_factory=MaaScriptAction, title="交互操作")
+
+
+class MaaUserInfo(BaseModel):
+    Name: str = PluginField("新用户", title="用户名称", validator="username")
+    Id: str = PluginField("", title="用户 ID")
+    Password: str = PluginField(
+        "",
+        title="密码",
+        format="password",
+        json_schema_extra={"sensitive": True},
+    )
+    Mode: Literal["简洁", "详细"] = PluginField("简洁", title="展示模式")
+    StageMode: str = PluginField(
+        "Fixed",
+        title="关卡模式",
+        ui_type="related-id",
+        related_config="PlanConfig",
+    )
+    Server: Literal["Official", "Bilibili", "YoStarEN", "YoStarJP", "YoStarKR", "txwy"] = (
+        PluginField(
             "Official",
-            OptionsValidator(
+            title="服务器",
+            options=_option_values(
                 ["Official", "Bilibili", "YoStarEN", "YoStarJP", "YoStarKR", "txwy"]
             ),
         )
-        self.Info_Status = ConfigItem("Info", "Status", True, BoolValidator())
-        self.Info_RemainedDay = ConfigItem(
-            "Info", "RemainedDay", -1, RangeValidator(-1, 9999)
-        )
-        self.Info_Annihilation = ConfigItem(
-            "Info",
-            "Annihilation",
-            "Annihilation",
-            OptionsValidator(
-                [
-                    "Close",
-                    "Annihilation",
-                    "Chernobog@Annihilation",
-                    "LungmenOutskirts@Annihilation",
-                    "LungmenDowntown@Annihilation",
-                ]
-            ),
-        )
-        self.Info_InfrastMode = ConfigItem(
-            "Info",
-            "InfrastMode",
-            "Normal",
-            OptionsValidator(["Normal", "Rotation", "Custom"]),
-        )
-        self.Info_InfrastName = ConfigItem(
-            "Info", "InfrastName", "-", VirtualConfigValidator(self.getInfrastName)
-        )
-        self.Info_InfrastIndex = ConfigItem(
-            "Info", "InfrastIndex", "-", VirtualConfigValidator(self.getInfrastIndex)
-        )
-        self.Info_Notes = ConfigItem("Info", "Notes", "无")
-        self.Info_MedicineNumb = ConfigItem(
-            "Info", "MedicineNumb", 0, RangeValidator(0, 9999)
-        )
-        self.Info_SeriesNumb = ConfigItem(
-            "Info",
-            "SeriesNumb",
-            "0",
-            OptionsValidator(["0", "6", "5", "4", "3", "2", "1", "-1"]),
-        )
-        self.Info_Stage = ConfigItem("Info", "Stage", "-")
-        self.Info_Stage_1 = ConfigItem("Info", "Stage_1", "-")
-        self.Info_Stage_2 = ConfigItem("Info", "Stage_2", "-")
-        self.Info_Stage_3 = ConfigItem("Info", "Stage_3", "-")
-        self.Info_Stage_Remain = ConfigItem("Info", "Stage_Remain", "-")
-        self.Info_IfSkland = ConfigItem("Info", "IfSkland", False, BoolValidator())
-        self.Info_SklandToken = ConfigItem("Info", "SklandToken", "", EncryptValidator())
-        self.Info_Tag = ConfigItem(
-            "Info", "Tag", "[ ]", VirtualConfigValidator(self.getTags)
-        )
-
-        self.Data_LastProxyDate = ConfigItem(
-            "Data", "LastProxyDate", "2000-01-01", DateTimeValidator("%Y-%m-%d")
-        )
-        self.Data_LastSklandDate = ConfigItem(
-            "Data", "LastSklandDate", "2000-01-01", DateTimeValidator("%Y-%m-%d")
-        )
-        self.Data_ProxyTimes = ConfigItem(
-            "Data", "ProxyTimes", 0, RangeValidator(0, 9999)
-        )
-        self.Data_IfPassCheck = ConfigItem("Data", "IfPassCheck", True, BoolValidator())
-        self.Data_CustomInfrast = ConfigItem(
-            "Data", "CustomInfrast", "{ }", JSONValidator()
-        )
-        self.Data_InfrastIndex = ConfigItem(
-            "Data", "InfrastIndex", "0", legacy_group="Info"
-        )
-
-        self.Task_IfStartUp = ConfigItem("Task", "IfStartUp", True, BoolValidator())
-        self.Task_IfFight = ConfigItem("Task", "IfFight", True, BoolValidator())
-        self.Task_IfInfrast = ConfigItem("Task", "IfInfrast", True, BoolValidator())
-        self.Task_IfRecruit = ConfigItem("Task", "IfRecruit", True, BoolValidator())
-        self.Task_IfMall = ConfigItem("Task", "IfMall", True, BoolValidator())
-        self.Task_IfAward = ConfigItem("Task", "IfAward", True, BoolValidator())
-        self.Task_IfRoguelike = ConfigItem(
-            "Task", "IfRoguelike", False, BoolValidator()
-        )
-        self.Task_IfReclamation = ConfigItem(
-            "Task", "IfReclamation", False, BoolValidator()
-        )
-
-        self.Notify_Enabled = ConfigItem("Notify", "Enabled", False, BoolValidator())
-        self.Notify_IfSendStatistic = ConfigItem(
-            "Notify", "IfSendStatistic", False, BoolValidator()
-        )
-        self.Notify_IfSendSixStar = ConfigItem(
-            "Notify", "IfSendSixStar", False, BoolValidator()
-        )
-        self.Notify_IfSendMail = ConfigItem(
-            "Notify", "IfSendMail", False, BoolValidator()
-        )
-        self.Notify_ToAddress = ConfigItem("Notify", "ToAddress", "")
-        self.Notify_IfServerChan = ConfigItem(
-            "Notify", "IfServerChan", False, BoolValidator()
-        )
-        self.Notify_ServerChanKey = ConfigItem("Notify", "ServerChanKey", "")
-        self.Notify_CustomWebhooks = MultipleConfig([Webhook])
-
-        super().__init__()
-
-    def getInfrastName(self) -> str:
-        if self.get("Info", "InfrastMode") != "Custom":
-            return "未使用自定义基建模式"
-
-        infrast_data = json.loads(self.get("Data", "CustomInfrast"))
-        if (
-            infrast_data.get("title", "文件标题") != "文件标题"
-            and infrast_data.get("description", "文件描述") != "文件描述"
-        ):
-            return f"{infrast_data['title']} - {infrast_data['description']}"
-        if infrast_data.get("title", "文件标题") != "文件标题":
-            return str(infrast_data["title"])
-        if infrast_data.get("id") is not None:
-            return str(infrast_data["id"])
-        return "未命名自定义基建"
-
-    def getInfrastIndex(self) -> str:
-        if self.get("Info", "InfrastMode") != "Custom":
-            return "-1"
-
-        infrast_data = json.loads(self.get("Data", "CustomInfrast"))
-        if len(infrast_data.get("plans", [])) == 0:
-            return "-1"
-
-        for index, plan in enumerate(infrast_data.get("plans", [])):
-            for period in plan.get("period", []):
-                if (
-                    datetime.strptime(period[0], "%H:%M").time()
-                    <= datetime.now().time()
-                    <= datetime.strptime(period[1], "%H:%M").time()
-                ):
-                    return str(index)
-
-        return self.get("Data", "InfrastIndex") or "0"
-
-    def getTags(self) -> str:
-        """生成用户标签列表。"""
-
-        tags: list[dict[str, str]] = []
-
-        if not self.get("Data", "IfPassCheck"):
-            tags.append({"text": "人工排查未通过", "color": "red"})
-
-        if (
-            datetime.strptime(self.get("Data", "LastProxyDate"), "%Y-%m-%d").date()
-            == datetime.now(tz=UTC4).date()
-        ):
-            tags.append(
-                {
-                    "text": f"日常：已代理{self.get('Data', 'ProxyTimes')}次",
-                    "color": "green",
-                }
-            )
-        else:
-            tags.append({"text": "日常：未代理", "color": "orange"})
-
-        if self.get("Info", "IfSkland"):
-            if (
-                datetime.strptime(self.get("Data", "LastSklandDate"), "%Y-%m-%d").date()
-                == datetime.now(tz=UTC8).date()
-            ):
-                tags.append({"text": "森空岛：已签到", "color": "green"})
-            else:
-                tags.append({"text": "森空岛：未签到", "color": "orange"})
-        else:
-            tags.append({"text": "森空岛：禁用", "color": "red"})
-
-        remained_day = self.get("Info", "RemainedDay")
-        if remained_day == -1:
-            tag_color = "gold"
-        elif remained_day == 0:
-            tag_color = "red"
-        elif remained_day <= 3:
-            tag_color = "orange"
-        elif remained_day <= 7:
-            tag_color = "yellow"
-        elif remained_day <= 30:
-            tag_color = "blue"
-        else:
-            tag_color = "green"
-        tags.append(
-            {
-                "text": (
-                    f"剩余天数：{remained_day}天"
-                    if remained_day >= 0
-                    else "剩余天数：无期限"
-                ),
-                "color": tag_color,
-            }
-        )
-
-        infrast_mode = self.get("Info", "InfrastMode")
-        if self.get("Task", "IfInfrast"):
-            if infrast_mode == "Normal":
-                infrast_text = "基建：常规"
-            elif infrast_mode == "Rotation":
-                infrast_text = "基建：轮换"
-            elif infrast_mode == "Custom":
-                infrast_name = self.getInfrastName()
-                infrast_text = (
-                    f"基建：{infrast_name}"
-                    if len(infrast_name) < 10
-                    else f"基建：{infrast_name[:10]}..."
-                )
-            else:
-                infrast_text = "基建：开启"
-            tags.append({"text": infrast_text, "color": "purple"})
-        else:
-            tags.append({"text": "基建：关闭", "color": "red"})
-
-        plan_data = {
-            stage_key: self.get_stage_zh(self.get("Info", stage_key))
-            for stage_key in MAA_STAGE_KEY[2:]
-        }
-        tag_color = "blue"
-        if self.get("Info", "StageMode") != "Fixed":
-            try:
-                plan = self.related_config["PlanConfig"][
-                    uuid.UUID(self.get("Info", "StageMode"))
-                ]
-            except Exception:
-                plan = None
-            if hasattr(plan, "get_current_info"):
-                plan_data = {
-                    stage_key: self.get_stage_zh(plan.get_current_info(stage_key).getValue())
-                    for stage_key in MAA_STAGE_KEY[2:]
-                }
-                tag_color = "green"
-
-        tags.append({"text": f"主关卡：{plan_data['Stage']}", "color": tag_color})
-
-        backup_stages = [
-            plan_data[f"Stage_{index}"]
-            for index in range(1, 4)
-            if plan_data[f"Stage_{index}"] != "禁用"
-        ]
-        if backup_stages:
-            tags.append({"text": f"备选：{', '.join(backup_stages)}", "color": tag_color})
-        if plan_data["Stage_Remain"] != "禁用":
-            tags.append(
-                {"text": f"剩余：{plan_data['Stage_Remain']}", "color": tag_color}
-            )
-
-        notes = self.get("Info", "Notes")
-        tags.append(
-            {
-                "text": f"备注：{notes}" if len(notes) <= 20 else f"备注：{notes[:20]}...",
-                "color": "pink",
-            }
-        )
-
-        return json.dumps(tags, ensure_ascii=False)
-
-    @staticmethod
-    def get_stage_zh(stage: str) -> str:
-        for stage_info in RESOURCE_STAGE_INFO:
-            if stage_info.get("value") == stage:
-                return (
-                    stage_info.get("text", stage)
-                    .replace("经验-6/5", "经验")
-                    .replace("龙门币-6/5", "龙门币")
-                    .replace("红票-5", "红票")
-                    .replace("技能-5", "技能")
-                    .replace("碳-5", "碳")
-                )
-        return stage
+    )
+    Status: bool = PluginField(True, title="启用用户")
+    RemainedDay: int = PluginField(-1, title="剩余天数", ge=-1, le=9999, step=1)
+    Annihilation: Literal[
+        "Close",
+        "Annihilation",
+        "Chernobog@Annihilation",
+        "LungmenOutskirts@Annihilation",
+        "LungmenDowntown@Annihilation",
+    ] = PluginField(
+        "Annihilation",
+        title="剿灭设置",
+        options=_option_values(
+            [
+                "Close",
+                "Annihilation",
+                "Chernobog@Annihilation",
+                "LungmenOutskirts@Annihilation",
+                "LungmenDowntown@Annihilation",
+            ]
+        ),
+    )
+    InfrastMode: Literal["Normal", "Rotation", "Custom"] = PluginField(
+        "Normal",
+        title="基建模式",
+        options=[
+            {"label": "常规模式", "value": "Normal"},
+            {"label": "一键轮休", "value": "Rotation"},
+            {"label": "自定义基建", "value": "Custom"},
+        ],
+    )
+    InfrastName: str = PluginField(
+        "-",
+        title="自定义基建名称",
+        ui_type="readonly",
+        readonly=True,
+        help="运行时根据自定义基建 JSON 自动解析。",
+        json_schema_extra={"virtual_handler": _build_infrast_name},
+    )
+    InfrastIndex: str = PluginField(
+        "-",
+        title="当前班次索引",
+        ui_type="readonly",
+        readonly=True,
+        json_schema_extra={"virtual_handler": _build_infrast_index},
+    )
+    Notes: str = PluginField(
+        "无",
+        title="备注",
+        rows=4,
+        size="large",
+        placeholder="填写该用户的备注信息",
+    )
+    MedicineNumb: int = PluginField(0, title="吃理智药数量", ge=0, le=9999, step=1)
+    SeriesNumb: Literal["0", "6", "5", "4", "3", "2", "1", "-1"] = PluginField(
+        "0",
+        title="连战次数",
+        options=[
+            {"label": "AUTO", "value": "0"},
+            {"label": "1", "value": "1"},
+            {"label": "2", "value": "2"},
+            {"label": "3", "value": "3"},
+            {"label": "4", "value": "4"},
+            {"label": "5", "value": "5"},
+            {"label": "6", "value": "6"},
+            {"label": "不切换", "value": "-1"},
+        ],
+    )
+    Stage: str = PluginField("-", title="主关卡")
+    Stage_1: str = PluginField("-", title="备选关卡 1")
+    Stage_2: str = PluginField("-", title="备选关卡 2")
+    Stage_3: str = PluginField("-", title="备选关卡 3")
+    Stage_Remain: str = PluginField("-", title="剩余理智关卡")
+    IfSkland: bool = PluginField(False, title="森空岛签到")
+    SklandToken: str = PluginField(
+        "",
+        title="森空岛 Token",
+        format="password",
+        json_schema_extra={"sensitive": True},
+    )
+    Tag: str = PluginField(
+        "[ ]",
+        title="用户标签",
+        ui_type="readonly",
+        readonly=True,
+        help="运行时自动生成，仅用于展示。",
+        json_schema_extra={"virtual_handler": _build_user_tags},
+    )
 
 
-class MaaConfig(ConfigBase):
-    """MAA 脚本配置。"""
-
-    related_config: dict[str, MultipleConfig] = {}
-
-    def __init__(self) -> None:
-        self.Info_Name = ConfigItem("Info", "Name", "新 MAA 脚本")
-        self.Info_Path = ConfigItem("Info", "Path", str(Path.cwd()), FolderValidator())
-
-        self.Emulator_Id = ConfigItem(
-            "Emulator",
-            "Id",
-            "-",
-            MultipleUIDValidator("-", self.related_config, "EmulatorConfig"),
-        )
-        self.Emulator_Index = ConfigItem("Emulator", "Index", "-")
-
-        self.Run_TaskTransitionMethod = ConfigItem(
-            "Run",
-            "TaskTransitionMethod",
-            "ExitEmulator",
-            OptionsValidator(["NoAction", "ExitGame", "ExitEmulator"]),
-        )
-        self.Run_ProxyTimesLimit = ConfigItem(
-            "Run", "ProxyTimesLimit", 0, RangeValidator(0, 9999)
-        )
-        self.Run_RunTimesLimit = ConfigItem(
-            "Run", "RunTimesLimit", 3, RangeValidator(1, 9999)
-        )
-        self.Run_AnnihilationTimeLimit = ConfigItem(
-            "Run", "AnnihilationTimeLimit", 40, RangeValidator(1, 9999)
-        )
-        self.Run_RoutineTimeLimit = ConfigItem(
-            "Run", "RoutineTimeLimit", 10, RangeValidator(1, 9999)
-        )
-        self.Run_AnnihilationAvoidWaste = ConfigItem(
-            "Run", "AnnihilationAvoidWaste", False, BoolValidator()
-        )
-
-        self.UserData = MultipleConfig([MaaUserConfig])
-
-        super().__init__()
+class MaaUserTask(BaseModel):
+    IfStartUp: bool = PluginField(True, title="自动启动")
+    IfFight: bool = PluginField(True, title="理智作战")
+    IfInfrast: bool = PluginField(True, title="基建换班")
+    IfRecruit: bool = PluginField(True, title="公开招募")
+    IfMall: bool = PluginField(True, title="信用收支")
+    IfAward: bool = PluginField(True, title="领取奖励")
+    IfRoguelike: bool = PluginField(False, title="肉鸽")
+    IfReclamation: bool = PluginField(False, title="生息演算")
 
 
-def bind_related_config(config_root: object) -> None:
-    """绑定运行时关联配置，避免依赖主程序中的同名类。"""
+class MaaUserNotify(BaseModel):
+    Enabled: bool = PluginField(False, title="启用通知")
+    IfSendStatistic: bool = PluginField(False, title="发送统计信息")
+    IfSendSixStar: bool = PluginField(False, title="发送高资喜报")
+    IfSendMail: bool = PluginField(False, title="邮件通知")
+    ToAddress: str = PluginField("", title="收件邮箱")
+    IfServerChan: bool = PluginField(False, title="Server酱通知")
+    ServerChanKey: str = PluginField("", title="Server酱 SENDKEY")
 
-    if hasattr(config_root, "EmulatorConfig"):
-        MaaConfig.related_config["EmulatorConfig"] = getattr(
-            config_root, "EmulatorConfig"
-        )
-    if hasattr(config_root, "PlanConfig"):
-        MaaUserConfig.related_config["PlanConfig"] = getattr(config_root, "PlanConfig")
+
+class MaaUserData(BaseModel):
+    LastProxyDate: str = PluginField(
+        "2000-01-01",
+        title="上次代理日期",
+        ui_type="datetime",
+        format="%Y-%m-%d",
+        readonly=True,
+        help="运行结束后自动更新。",
+    )
+    LastSklandDate: str = PluginField(
+        "2000-01-01",
+        title="上次森空岛签到日期",
+        ui_type="datetime",
+        format="%Y-%m-%d",
+        readonly=True,
+        help="运行结束后自动更新。",
+    )
+    ProxyTimes: int = PluginField(
+        0,
+        title="今日代理次数",
+        ge=0,
+        le=9999,
+        step=1,
+        readonly=True,
+        help="运行结束后自动更新。",
+    )
+    IfPassCheck: bool = PluginField(True, title="人工排查通过")
+    CustomInfrast: str = PluginField(
+        "{ }",
+        title="自定义基建 JSON",
+        ui_type="json",
+        json_type="object",
+        rows=12,
+        size="large",
+    )
+    InfrastIndex: str = PluginField(
+        "0",
+        title="自定义基建排班",
+        json_schema_extra={"legacy_group": "Info"},
+    )
 
 
-__all__ = ["Config", "MaaConfig", "MaaUserConfig", "bind_related_config"]
+class MaaUserConfigModel(BaseModel):
+    Info: MaaUserInfo = Field(default_factory=MaaUserInfo, title="基础信息")
+    Task: MaaUserTask = Field(default_factory=MaaUserTask, title="任务开关")
+    Notify: MaaUserNotify = Field(default_factory=MaaUserNotify, title="通知设置")
+    Data: MaaUserData = Field(default_factory=MaaUserData, title="运行数据")
+
+
+__all__ = [
+    "Config",
+    "MaaConfigModel",
+    "MaaUserConfigModel",
+]
