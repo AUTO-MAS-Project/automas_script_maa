@@ -293,8 +293,8 @@ class MaaScriptAction(BaseModel):
     MAAConfig: str = PluginField(
         "",
         title="MAA配置",
-        ui_type="button",
-        configurable=False,
+        ui_type="readonly",
+        readonly=True,
         help="启动 MAA 默认配置会话，完成后点击保存配置结束会话。",
         button={
             "label": "MAA配置",
@@ -388,11 +388,10 @@ class MaaUserInfo(BaseModel):
         ],
     )
     InfrastName: str = PluginField(
-        "-",
+        "",
         title="自定义基建名称",
         ui_type="readonly",
         readonly=True,
-        help="运行时根据自定义基建 JSON 自动解析。",
         json_schema_extra={"virtual_handler": _build_infrast_name},
     )
     InfrastIndex: str = PluginField(
@@ -557,6 +556,27 @@ class MaaUserData(BaseModel):
         json_type="object",
         rows=12,
         size="large",
+    )
+    ImportCustomInfrast: str = PluginField(
+        "",
+        title="导入自定义基建 JSON",
+        ui_type="button",
+        configurable=False,
+        help="选择本地 JSON 文件后，会按现有基建导入接口同步到当前用户。",
+        button={
+            "label": "导入自定义基建 JSON",
+            "path": "/api/scripts/user/infrastructure",
+            "method": "POST",
+            "payload": {
+                "scriptId": "{{scriptId}}",
+                "userId": "{{userId}}",
+                "jsonFile": "{{pickedFile}}",
+            },
+            "refresh": True,
+            "file_picker": {
+                "filters": [{"name": "JSON Files", "extensions": ["json"]}],
+            },
+        },
     )
     InfrastIndex: str = PluginField(
         "0",
