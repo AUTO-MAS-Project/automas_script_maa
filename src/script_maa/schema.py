@@ -234,6 +234,7 @@ class Config(BaseModel):
         description="请直接在脚本配置使用本插件",
         min_length=2,
         max_length=32,
+        size="1/3"
     )
 
 
@@ -245,7 +246,7 @@ class MaaScriptInfo(BaseModel):
         ui_type="folder",
         path_kind="folder",
         placeholder="请选择 MAA 的安装目录",
-        size="large",
+        size="2/3",
     )
 
 
