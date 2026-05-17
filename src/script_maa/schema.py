@@ -348,6 +348,7 @@ class MaaUserInfo(BaseModel):
         title="关卡模式",
         ui_type="related-id",
         related_config="PlanConfig",
+        options_provider={"source": "plan_combox"},
     )
     Server: Literal["Official", "Bilibili", "YoStarEN", "YoStarJP", "YoStarKR", "txwy"] = (
         PluginField(
@@ -566,6 +567,7 @@ class MaaUserData(BaseModel):
 
 class MaaUserConfigModel(BaseModel):
     Info: MaaUserInfo = Field(default_factory=MaaUserInfo, title="基础信息")
+    Stage: MaaUserStage = Field(default_factory=MaaUserStage, title="关卡设置")
     Task: MaaUserTask = Field(default_factory=MaaUserTask, title="任务开关")
     Notify: MaaUserNotify = Field(default_factory=MaaUserNotify, title="通知设置")
     Data: MaaUserData = Field(default_factory=MaaUserData, title="运行数据")

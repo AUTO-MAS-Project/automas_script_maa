@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import shutil
-import copy
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -83,41 +82,7 @@ class MaaAdapterHooks(ScriptAdapterHooks):
         config_data: dict[str, Any],
         ctx: SchemaDecorationContext,
     ) -> dict[str, Any]:
-        set_schema_field_options(schema, "Stage.StageMode", await ctx.get_plan_combox())
-
-        stage_options = await ctx.get_stage_info("User")
-        if not isinstance(stage_options, list):
-            stage_options = []
-        stage_remain_options = copy.deepcopy(stage_options)
-        for option in stage_remain_options:
-            if isinstance(option, dict) and option.get("value") == "-":
-                option["label"] = "不选择"
-
-        for field_key in ("Stage.Stage", "Stage.Stage_1", "Stage.Stage_2", "Stage.Stage_3"):
-            set_schema_field_options(
-                schema,
-                field_key,
-                stage_options,
-                allow_custom=True,
-            )
-            set_schema_field_state(
-                schema,
-                field_key,
-                placeholder="选择或输入自定义关卡",
-            )
-
-        set_schema_field_options(
-            schema,
-            "Stage.Stage_Remain",
-            stage_remain_options,
-            allow_custom=True,
-        )
-        set_schema_field_state(
-            schema,
-            "Stage.Stage_Remain",
-            placeholder="选择或输入自定义关卡",
-            help_text="选择“不选择”时，将不使用剩余理智关卡。",
-        )
+        _ = ctx
 
         info_group = config_data.get("Info")
         if not isinstance(info_group, dict):

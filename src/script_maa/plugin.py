@@ -3,6 +3,7 @@ from __future__ import annotations
 from app.plugins import ScriptAdapterDefinition, ScriptAdapterPlugin
 
 from .adapter import MaaAdapterHooks
+from .options import resolve_plan_combox, resolve_stage_info
 from .schema import MaaConfigModel, MaaUserConfigModel
 
 DEFAULT_INSTANCE = {
@@ -41,5 +42,9 @@ class Plugin(ScriptAdapterPlugin):
                 icon="MAA",
                 editor_kind="plugin:script_maa",
                 metadata={"framework": "script_adapter"},
+                options_providers={
+                    "plan_combox": resolve_plan_combox,
+                    "stage_info": resolve_stage_info,
+                },
             )
         ]
