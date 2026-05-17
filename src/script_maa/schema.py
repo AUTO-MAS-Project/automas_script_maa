@@ -408,7 +408,19 @@ class MaaUserInfo(BaseModel):
         size="large",
         placeholder="填写该用户的备注信息",
     )
-    MedicineNumb: int = PluginField(0, title="吃理智药数量", ge=0, le=9999, step=1)
+    Tag: str = PluginField(
+        "[ ]",
+        title="用户标签",
+        ui_type="readonly",
+        readonly=True,
+        hidden=True,
+        help="运行时自动生成，仅用于展示。",
+        json_schema_extra={"virtual_handler": _build_user_tags},
+    )
+
+
+class MaaUserStage(BaseModel):
+    MedicineNumb: int = PluginField(0, title="吃理智药数量", ge=0, le=9999, step=1,size="1/2")
     SeriesNumb: Literal["0", "6", "5", "4", "3", "2", "1", "-1"] = PluginField(
         "0",
         title="连战次数",
@@ -422,26 +434,56 @@ class MaaUserInfo(BaseModel):
             {"label": "6", "value": "6"},
             {"label": "不切换", "value": "-1"},
         ],
+        size="1/2"
     )
-    Stage: str = PluginField("-", title="主关卡")
-    Stage_1: str = PluginField("-", title="备选关卡 1")
-    Stage_2: str = PluginField("-", title="备选关卡 2")
-    Stage_3: str = PluginField("-", title="备选关卡 3")
-    Stage_Remain: str = PluginField("-", title="剩余理智关卡")
+    Stage: str = PluginField(
+        "-",
+        title="主关卡",
+        size="large",
+        placeholder="选择或输入自定义关卡",
+        options_provider={"source": "stage_info", "type": "User", "allow_custom": True},
+    )
+    Stage_1: str = PluginField(
+        "-",
+        title="备选关卡 1",
+        size="1/4",
+        placeholder="选择或输入自定义关卡",
+        options_provider={"source": "stage_info", "type": "User", "allow_custom": True},
+    )
+    Stage_2: str = PluginField(
+        "-",
+        title="备选关卡 2",
+        size="1/4",
+        placeholder="选择或输入自定义关卡",
+        options_provider={"source": "stage_info", "type": "User", "allow_custom": True},
+    )
+    Stage_3: str = PluginField(
+        "-",
+        title="备选关卡 3",
+        size="1/4",
+        placeholder="选择或输入自定义关卡",
+        options_provider={"source": "stage_info", "type": "User", "allow_custom": True},
+    )
+    Stage_Remain: str = PluginField(
+        "-",
+        title="剩余理智关卡",
+        size="1/4",
+        placeholder="选择或输入自定义关卡",
+        help="选择“不选择”时，将不使用剩余理智关卡。",
+        options_provider={
+            "source": "stage_info",
+            "type": "User",
+            "allow_custom": True,
+            "none_label": "不选择",
+        },
+    )
     IfSkland: bool = PluginField(False, title="森空岛签到")
     SklandToken: str = PluginField(
         "",
         title="森空岛 Token",
         format="password",
         json_schema_extra={"sensitive": True},
-    )
-    Tag: str = PluginField(
-        "[ ]",
-        title="用户标签",
-        ui_type="readonly",
-        readonly=True,
-        help="运行时自动生成，仅用于展示。",
-        json_schema_extra={"virtual_handler": _build_user_tags},
+        size="2/3"
     )
 
 
