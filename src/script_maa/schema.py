@@ -441,28 +441,28 @@ class MaaUserStage(BaseModel):
         title="主关卡",
         size="large",
         placeholder="选择或输入自定义关卡",
-        options_provider={"source": "stage_info", "type": "User", "allow_custom": True},
+        options_provider={"source": "stage_info", "type": "Today", "allow_custom": True},
     )
     Stage_1: str = PluginField(
         "-",
         title="备选关卡 1",
         size="1/4",
         placeholder="选择或输入自定义关卡",
-        options_provider={"source": "stage_info", "type": "User", "allow_custom": True},
+        options_provider={"source": "stage_info", "type": "Today", "allow_custom": True},
     )
     Stage_2: str = PluginField(
         "-",
         title="备选关卡 2",
         size="1/4",
         placeholder="选择或输入自定义关卡",
-        options_provider={"source": "stage_info", "type": "User", "allow_custom": True},
+        options_provider={"source": "stage_info", "type": "Today", "allow_custom": True},
     )
     Stage_3: str = PluginField(
         "-",
         title="备选关卡 3",
         size="1/4",
         placeholder="选择或输入自定义关卡",
-        options_provider={"source": "stage_info", "type": "User", "allow_custom": True},
+        options_provider={"source": "stage_info", "type": "Today", "allow_custom": True},
     )
     Stage_Remain: str = PluginField(
         "-",
@@ -472,7 +472,7 @@ class MaaUserStage(BaseModel):
         help="选择“不选择”时，将不使用剩余理智关卡。",
         options_provider={
             "source": "stage_info",
-            "type": "User",
+            "type": "Today",
             "allow_custom": True,
             "none_label": "不选择",
         },
