@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "automas_script_maa"
-version = "0.0.4"
+version = "0.0.5-alpha"
 description = "MAA 专项适配"
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.10"
