@@ -161,14 +161,14 @@ class AutoProxyTask(TaskExecuteBase):
 
         # 森空岛签到
         if (
-            self.cur_user_config.get("Info", "IfSkland")
-            and self.cur_user_config.get("Info", "SklandToken")
+            self.cur_user_config.get("Stage", "IfSkland")
+            and self.cur_user_config.get("Stage", "SklandToken")
             and self.cur_user_config.get("Data", "LastSklandDate")
             != datetime.now(tz=UTC8).strftime("%Y-%m-%d")
         ):
             self.script_info.log = "正在执行森空岛签到"
             skland_result = await skland_sign_in(
-                self.cur_user_config.get("Info", "SklandToken"),
+                self.cur_user_config.get("Stage", "SklandToken"),
                 app_code="arknights",
             )
             for t, user_list in skland_result.items():
@@ -196,7 +196,7 @@ class AutoProxyTask(TaskExecuteBase):
                 await self.cur_user_config.set(
                     "Data", "LastSklandDate", datetime.now(tz=UTC8).strftime("%Y-%m-%d")
                 )
-        elif self.cur_user_config.get("Info", "IfSkland") and self.cur_user_config.get(
+        elif self.cur_user_config.get("Stage", "IfSkland") and self.cur_user_config.get(
             "Data", "LastSklandDate"
         ) != datetime.now(tz=UTC8).strftime("%Y-%m-%d"):
             logger.warning(

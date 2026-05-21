@@ -127,7 +127,7 @@ def _build_user_tags(config: Any) -> str:
     else:
         tags.append({"text": "日常：未代理", "color": "orange"})
 
-    if config.get("Info", "IfSkland"):
+    if config.get("Stage", "IfSkland"):
         if (
             datetime.strptime(config.get("Data", "LastSklandDate"), "%Y-%m-%d").date()
             == datetime.now(tz=UTC8).date()
@@ -411,9 +411,8 @@ class MaaUserInfo(BaseModel):
     Tag: str = PluginField(
         "[ ]",
         title="用户标签",
-        ui_type="readonly",
+        ui_type="tag",
         readonly=True,
-        hidden=True,
         help="运行时自动生成，仅用于展示。",
         json_schema_extra={"virtual_handler": _build_user_tags},
     )
