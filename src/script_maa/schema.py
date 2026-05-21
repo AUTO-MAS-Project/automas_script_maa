@@ -182,14 +182,14 @@ def _build_user_tags(config: Any) -> str:
         tags.append({"text": "基建：关闭", "color": "red"})
 
     plan_data = {
-        stage_key: _get_stage_zh(config.get("Info", stage_key))
+        stage_key: _get_stage_zh(config.get("Stage", stage_key))
         for stage_key in MAA_STAGE_KEY[2:]
     }
     tag_color = "blue"
-    if config.get("Info", "StageMode") != "Fixed":
+    if config.get("Stage", "StageMode") != "Fixed":
         try:
             plan = config.related_config["PlanConfig"][
-                uuid.UUID(config.get("Info", "StageMode"))
+                uuid.UUID(config.get("Stage", "StageMode"))
             ]
         except Exception:
             plan = None
