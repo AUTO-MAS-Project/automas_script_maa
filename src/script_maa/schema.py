@@ -186,10 +186,10 @@ def _build_user_tags(config: Any) -> str:
         for stage_key in MAA_STAGE_KEY[2:]
     }
     tag_color = "blue"
-    if config.get("Stage", "StageMode") != "Fixed":
+    if config.get("Info", "StageMode") != "Fixed":
         try:
             plan = config.related_config["PlanConfig"][
-                uuid.UUID(config.get("Stage", "StageMode"))
+                uuid.UUID(config.get("Info", "StageMode"))
             ]
         except Exception:
             plan = None
@@ -413,6 +413,7 @@ class MaaUserInfo(BaseModel):
         title="用户标签",
         ui_type="tag",
         readonly=True,
+        hidden=True,
         help="运行时自动生成，仅用于展示。",
         json_schema_extra={"virtual_handler": _build_user_tags},
     )

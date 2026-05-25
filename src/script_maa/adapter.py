@@ -87,10 +87,7 @@ class MaaAdapterHooks(ScriptAdapterHooks):
         info_group = config_data.get("Info")
         if not isinstance(info_group, dict):
             info_group = {}
-        stage_group = config_data.get("Stage")
-        if not isinstance(stage_group, dict):
-            stage_group = {}
-        stage_mode = str(stage_group.get("StageMode") or "Fixed")
+        stage_mode = str(info_group.get("StageMode") or "Fixed")
         if stage_mode != "Fixed":
             plan_help = "当前由计划表控制，请前往计划表修改。"
             for field_key in (

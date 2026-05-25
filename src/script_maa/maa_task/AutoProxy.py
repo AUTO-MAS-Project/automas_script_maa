@@ -450,14 +450,14 @@ class AutoProxyTask(TaskExecuteBase):
             task_set["StartUp"]["AccountName"] = self.cur_user_config.get("Info", "Id")
 
         # 加载关卡号配置
-        if self.cur_user_config.get("Stage", "StageMode") == "Fixed":
+        if self.cur_user_config.get("Info", "StageMode") == "Fixed":
             plan_data = {
                 stage_key: self.cur_user_config.get("Stage", stage_key)
                 for stage_key in MAA_STAGE_KEY
             }
         else:
             plan = Config.PlanConfig[
-                uuid.UUID(self.cur_user_config.get("Stage", "StageMode"))
+                uuid.UUID(self.cur_user_config.get("Info", "StageMode"))
             ]
             plan_data = {
                 stage_key: plan.get_current_info(stage_key).getValue()
