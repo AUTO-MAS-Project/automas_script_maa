@@ -8,8 +8,7 @@ version = "0.0.5-alpha"
 description = "MAA 专项适配"
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.10"
-dependencies = ["jinja2>=3.1", "pydantic>=2.0"]
-
+dependencies = ["pydantic>=2.0", "auto-mas-plugin-sdk>=5.2.0"]
 [project.entry-points."auto_mas.plugins"]
 script_MAA = "script_maa.plugin:Plugin"
 
