@@ -70,6 +70,8 @@ class AutoProxyTask(TaskExecuteBase):
         script_config: Any,
         user_config: MultipleConfig[Any],
         emulator_manager: DeviceBase,
+        notify_service: Any | None = None,
+        notify_channels: list[str] | None = None,
     ):
         super().__init__()
 
@@ -81,10 +83,55 @@ class AutoProxyTask(TaskExecuteBase):
         self.script_config = script_config
         self.user_config = user_config
         self.emulator_manager = emulator_manager
+        self.notify_service = notify_service
+        self.notify_channels = notify_channels
         self.cur_user_item = self.script_info.user_list[self.script_info.current_index]
         self.cur_user_uid = uuid.UUID(self.cur_user_item.user_id)
         self.cur_user_config = self.user_config[self.cur_user_uid]
         self.check_result = "-"
+
+    async def _push_system_notification(
+        self,
+        title: str,
+        message: str,
+        ticker: str,
+        timeout: int,
+    ) -> None:
+        if self.notify_channels == []:
+            return
+
+        if self.notify_service is not None:
+            try:
+                if self.notify_channels is not None and callable(
+                    getattr(self.notify_service, "send_payload", None)
+                ):
+                    result = await self.notify_service.send_payload(
+                        {
+                            "kind": "system",
+                            "title": title,
+                            "text": message,
+                            "ticker": ticker,
+                            "timeout": timeout,
+                        },
+                        channels=self.notify_channels,
+                    )
+                    if isinstance(result, dict) and any(bool(ok) for ok in result.values()):
+                        return
+                    return
+                if not callable(getattr(self.notify_service, "send_system", None)):
+                    raise AttributeError("notify service has no send_system method")
+                sent = await self.notify_service.send_system(
+                    title=title,
+                    message=message,
+                    ticker=ticker,
+                    timeout=timeout,
+                )
+                if sent:
+                    return
+            except Exception as exc:
+                logger.warning(f"notify 系统通知发送失败，将回退旧实现: {type(exc).__name__}: {exc}")
+
+        await Notify.push_plyer(title, message, ticker, timeout)
 
     async def check(self) -> str:
 
@@ -270,7 +317,7 @@ class AutoProxyTask(TaskExecuteBase):
                     except Exception as e:
                         logger.exception(f"关闭模拟器失败: {e}")
 
-                    await Notify.push_plyer(
+                    await self._push_system_notification(
                         "用户自动代理出现异常！",
                         f"用户 {self.cur_user_item.name} 的{MAA_RUN_MOOD_BOOK[self.mode]}部分出现一次异常",
                         f"{self.cur_user_item.name}的{MAA_RUN_MOOD_BOOK[self.mode]}出现异常",
@@ -321,7 +368,7 @@ class AutoProxyTask(TaskExecuteBase):
                         logger.exception(f"关闭模拟器失败: {e}")
                     await System.kill_process(self.maa_exe_path)
 
-                    await Notify.push_plyer(
+                    await self._push_system_notification(
                         "用户自动代理出现异常！",
                         f"用户 {self.cur_user_item.name} 的{MAA_RUN_MOOD_BOOK[self.mode]}部分出现一次异常",
                         f"{self.cur_user_item.name}的{MAA_RUN_MOOD_BOOK[self.mode]}出现异常",
@@ -686,6 +733,9 @@ class AutoProxyTask(TaskExecuteBase):
         if_success = self.run_book["Annihilation"] and self.run_book["Routine"]
         success_symbol = "√" if if_success else "X"
 
+        if self.notify_channels == []:
+            return
+
         try:
             if if_six_star:
                 await push_notification(
@@ -693,12 +743,16 @@ class AutoProxyTask(TaskExecuteBase):
                     f"喜报: 用户 {self.cur_user_item.name} 公招出六星啦！",
                     {"user_name": self.cur_user_item.name},
                     self.cur_user_config,
+                    notify_service=self.notify_service,
+                    notify_channels=self.notify_channels,
                 )
             await push_notification(
                 "统计信息",
                 f"{datetime.now().strftime('%m-%d')} |{success_symbol}|  {self.cur_user_item.name} 的自动代理统计报告",
                 statistics,
                 self.cur_user_config,
+                notify_service=self.notify_service,
+                notify_channels=self.notify_channels,
             )
         except Exception as e:
             logger.exception(f"推送通知时出现异常: {e}")
@@ -740,7 +794,7 @@ class AutoProxyTask(TaskExecuteBase):
 
             self.cur_user_item.status = "完成"
             logger.success(f"用户 {self.cur_user_uid} 的自动代理任务已完成")
-            await Notify.push_plyer(
+            await self._push_system_notification(
                 "成功完成一个自动代理任务！",
                 f"已完成用户 {self.cur_user_item.name} 的自动代理任务",
                 f"已完成 {self.cur_user_item.name} 的自动代理任务",

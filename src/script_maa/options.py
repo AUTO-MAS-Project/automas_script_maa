@@ -48,3 +48,52 @@ async def resolve_stage_info(
             if isinstance(option, dict) and option.get("value") == "-":
                 option["label"] = none_label
     return data
+
+
+async def resolve_notification_channels(
+    *,
+    options_provider: dict[str, Any],
+    field_schema: dict[str, Any],
+    config_data: dict[str, Any],
+    ctx: SchemaOptionsProviderContext,
+) -> list[dict[str, Any]]:
+    _ = options_provider, field_schema, config_data, ctx
+
+    data: list[dict[str, Any]] = [{"label": "全部通知频道", "value": "all"}]
+
+    try:
+        from app.plugins import PluginManager
+
+        notify = PluginManager.service.get("notify")
+    except Exception:
+        notify = None
+
+    channels = getattr(notify, "channels", None)
+    if not callable(channels):
+        return data
+
+    try:
+        raw_channels = channels(detail=True)
+    except TypeError:
+        raw_channels = channels()
+    except Exception:
+        return data
+
+    for item in raw_channels:
+        if isinstance(item, dict):
+            name = str(item.get("name") or "").strip()
+            if not name or name == "all":
+                continue
+            label = name
+            enabled = item.get("enabled")
+            channel_type = str(item.get("type") or "").strip()
+            if channel_type:
+                label = f"{name} ({channel_type})"
+            if enabled is False:
+                label = f"{label} - disabled"
+            data.append({"label": label, "value": name})
+        else:
+            name = str(item or "").strip()
+            if name and name != "all":
+                data.append({"label": name, "value": name})
+    return data

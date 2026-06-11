@@ -23,6 +23,77 @@ from .constants import TASK_MODE_ZH
 logger = get_logger("MAA 适配")
 
 
+def _get_notify_service(runtime: ScriptAdapterRuntime) -> Any | None:
+    if runtime.plugin_context is None:
+        return None
+    return runtime.plugin_context.get("notify")
+
+
+def _get_notify_channels(script_config: Any | None) -> list[str] | None:
+    if script_config is None:
+        return []
+    try:
+        raw_channels = script_config.get("Notify", "Channels")
+    except Exception:
+        return []
+    if not isinstance(raw_channels, list):
+        return []
+
+    channels: list[str] = []
+    seen: set[str] = set()
+    for item in raw_channels:
+        name = str(item or "").strip()
+        if not name or name in seen:
+            continue
+        if name == "all":
+            return None
+        seen.add(name)
+        channels.append(name)
+    return channels
+
+
+async def _push_system_notification(
+    notify_service: Any | None,
+    *,
+    title: str,
+    message: str,
+    ticker: str,
+    timeout: int,
+    channels: list[str] | None = None,
+) -> bool:
+    if channels == []:
+        return True
+    if notify_service is None:
+        return False
+
+    try:
+        if channels is not None and callable(getattr(notify_service, "send_payload", None)):
+            result = await notify_service.send_payload(
+                {
+                    "kind": "system",
+                    "title": title,
+                    "text": message,
+                    "ticker": ticker,
+                    "timeout": timeout,
+                },
+                channels=channels,
+            )
+            return isinstance(result, dict) and any(bool(ok) for ok in result.values())
+        if callable(getattr(notify_service, "send_system", None)):
+            return bool(
+                await notify_service.send_system(
+                    title=title,
+                    message=message,
+                    ticker=ticker,
+                    timeout=timeout,
+                )
+            )
+        return False
+    except Exception as exc:
+        logger.warning(f"notify 系统通知发送失败，将回退旧实现: {type(exc).__name__}: {exc}")
+        return False
+
+
 def _build_infrast_plan_options(config_data: dict[str, Any]) -> list[dict[str, str]]:
     data_group = config_data.get("Data")
     if not isinstance(data_group, dict):
@@ -236,6 +307,8 @@ class MaaAdapterHooks(ScriptAdapterHooks):
             runtime.script_config,
             runtime.user_config,
             runtime.extra.get("emulator_manager"),
+            notify_service=_get_notify_service(runtime),
+            notify_channels=_get_notify_channels(runtime.script_config),
         )
 
     def run_manual_review(self, runtime: ScriptAdapterRuntime, user_index: int):
@@ -275,6 +348,8 @@ class MaaAdapterHooks(ScriptAdapterHooks):
             return
 
         logger.info("MAA 主任务已结束, 开始执行后续操作")
+        notify_service = _get_notify_service(runtime)
+        notify_channels = _get_notify_channels(script_config)
         storage_script_config = runtime.get_storage_script_config()
         await storage_script_config.unlock()
         logger.success(f"已解锁脚本配置 {runtime.script_info.script_id}")
@@ -338,20 +413,34 @@ class MaaAdapterHooks(ScriptAdapterHooks):
                 "result": runtime.script_info.result,
             }
 
-            await Notify.push_plyer(
-                title.replace("报告", "已完成！"),
-                (
-                    f"已完成用户数: {len(over_user)}, "
-                    f"未完成用户数: {len(error_user) + len(wait_user)}"
-                ),
-                (
-                    f"已完成用户数: {len(over_user)}, "
-                    f"未完成用户数: {len(error_user) + len(wait_user)}"
-                ),
-                10,
+            system_message = (
+                f"已完成用户数: {len(over_user)}, "
+                f"未完成用户数: {len(error_user) + len(wait_user)}"
             )
+            system_sent = await _push_system_notification(
+                notify_service,
+                title=title.replace("报告", "已完成！"),
+                message=system_message,
+                ticker=system_message,
+                timeout=10,
+                channels=notify_channels,
+            )
+            if not system_sent and notify_channels is None:
+                await Notify.push_plyer(
+                    title.replace("报告", "已完成！"),
+                    system_message,
+                    system_message,
+                    10,
+                )
             try:
-                await push_notification("代理结果", title, result, None)
+                await push_notification(
+                    "代理结果",
+                    title,
+                    result,
+                    None,
+                    notify_service=notify_service,
+                    notify_channels=notify_channels,
+                )
             except Exception as error:
                 logger.exception(f"推送代理结果时出现异常: {error}")
                 await Config.send_websocket_message(

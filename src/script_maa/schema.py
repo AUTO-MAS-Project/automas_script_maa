@@ -241,7 +241,7 @@ class Config(BaseModel):
 class MaaScriptInfo(BaseModel):
     Name: str = PluginField("新 MAA 脚本", title="脚本名称")
     Path: str = PluginField(
-        str(Path.cwd()),
+        str(Path.home()),
         title="MAA 根目录",
         ui_type="folder",
         path_kind="folder",
@@ -289,12 +289,24 @@ class MaaScriptRun(BaseModel):
     AnnihilationAvoidWaste: bool = PluginField(False, title="剿灭避免浪费理智")
 
 
+class MaaScriptNotify(BaseModel):
+    Channels: list[str] = PluginField(
+        default_factory=list,
+        title="通知频道",
+        ui_type="multiselect",
+        options_provider={"source": "notification_channels"},
+        help="为空时不使用通知；选择 all 时发送给 notify 插件当前已注册的全部频道；选择其他频道时仅发送给指定频道。",
+        size="large",
+    )
+
+
 class MaaScriptAction(BaseModel):
     MAAConfig: str = PluginField(
         "",
         title="MAA配置",
         ui_type="readonly",
         readonly=True,
+        json_schema_extra={"icon": "SettingOutlined"},
         help="启动 MAA 默认配置会话，完成后点击保存配置结束会话。",
         button={
             "label": "MAA配置",
@@ -330,6 +342,7 @@ class MaaConfigModel(BaseModel):
     Info: MaaScriptInfo = Field(default_factory=MaaScriptInfo, title="基础信息")
     Emulator: MaaScriptEmulator = Field(default_factory=MaaScriptEmulator, title="模拟器设置")
     Run: MaaScriptRun = Field(default_factory=MaaScriptRun, title="运行设置")
+    Notify: MaaScriptNotify = Field(default_factory=MaaScriptNotify, title="通知设置")
     Action: MaaScriptAction = Field(default_factory=MaaScriptAction, title="交互操作")
 
 
