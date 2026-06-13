@@ -7,7 +7,7 @@ from .options import resolve_notification_channels, resolve_plan_combox, resolve
 from .schema import MaaConfigModel, MaaUserConfigModel
 
 DEFAULT_INSTANCE = {
-    "name": "script_MAA 脚本桥接",
+    "name": "script_MAA",
     "enabled": True,
     "config": {},
 }
@@ -24,7 +24,7 @@ SCRIPT_TYPE_BINDINGS = [
 class Plugin(ScriptAdapterPlugin):
     """把 MAA 适配包注册为统一脚本适配插件。"""
 
-    wants = "notify"
+    wants = ["notify", "emulator"]
 
     def build_script_adapters(self) -> list[ScriptAdapterDefinition]:
         return [

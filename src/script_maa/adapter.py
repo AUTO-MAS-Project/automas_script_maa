@@ -20,7 +20,7 @@ from app.utils import get_logger
 
 from .constants import TASK_MODE_ZH
 
-logger = get_logger("MAA 适配")
+logger = get_logger("MAA 专项适配")
 
 
 def _get_notify_service(runtime: ScriptAdapterRuntime) -> Any | None:
@@ -116,36 +116,6 @@ def _build_infrast_plan_options(config_data: dict[str, Any]) -> list[dict[str, s
 
 class MaaAdapterHooks(ScriptAdapterHooks):
     """MAA 专项适配钩子。"""
-
-    async def decorate_script_schema(
-        self,
-        schema: dict[str, Any],
-        config_data: dict[str, Any],
-        ctx: SchemaDecorationContext,
-    ) -> dict[str, Any]:
-        set_schema_field_options(schema, "Emulator.Id", await ctx.get_emulator_combox())
-
-        selected_emulator = ""
-        emulator_group = config_data.get("Emulator")
-        if isinstance(emulator_group, dict):
-            selected_emulator = str(emulator_group.get("Id") or "")
-
-        emulator_index_options = [{"label": "未选择", "value": "-"}]
-        if selected_emulator and selected_emulator != "-":
-            try:
-                scanned_options = await ctx.get_emulator_devices_combox(selected_emulator)
-                if scanned_options:
-                    emulator_index_options = scanned_options
-            except Exception as exc:
-                logger.warning(f"获取 MAA 模拟器多开实例失败: {type(exc).__name__}: {exc}")
-
-        set_schema_field_options(schema, "Emulator.Index", emulator_index_options)
-        set_schema_field_state(
-            schema,
-            "Emulator.Index",
-            help_text="选择多开序号；若列表为空，可保持为“未选择”后由运行时自动处理。",
-        )
-        return schema
 
     async def decorate_user_schema(
         self,
@@ -247,8 +217,6 @@ class MaaAdapterHooks(ScriptAdapterHooks):
         return "Pass"
 
     async def prepare(self, runtime: ScriptAdapterRuntime) -> None:
-        from app.core.emulator_manager import EmulatorManager
-
         storage_script_config = runtime.get_storage_script_config()
         await storage_script_config.lock()
 
@@ -266,9 +234,21 @@ class MaaAdapterHooks(ScriptAdapterHooks):
         temp_path = Path.cwd() / f"data/{runtime.script_info.script_id}/Temp"
         runtime.extra["maa_set_path"] = maa_set_path
         runtime.extra["temp_path"] = temp_path
-        runtime.extra["emulator_manager"] = await EmulatorManager.get_emulator_instance(
-            script_config.get("Emulator", "Id")
+        emulator_service = (
+            runtime.plugin_context.get("emulator")
+            if runtime.plugin_context is not None
+            else None
         )
+        if emulator_service is not None and callable(getattr(emulator_service, "get_instance", None)):
+            runtime.extra["emulator_manager"] = await emulator_service.get_instance(
+                script_config.get("Emulator", "Id")
+            )
+        else:
+            from app.core.emulator_manager import EmulatorManager
+
+            runtime.extra["emulator_manager"] = await EmulatorManager.get_emulator_instance(
+                script_config.get("Emulator", "Id")
+            )
 
         temp_path.mkdir(parents=True, exist_ok=True)
         if maa_set_path.exists():
