@@ -13,10 +13,6 @@ from app.plugins.fields import PluginField
 from .constants import MAA_STAGE_KEY, MAA_TASK_OPTIONS, RESOURCE_STAGE_INFO, UTC4, UTC8
 
 
-def _option_values(values: list[str]) -> list[dict[str, str]]:
-    return [{"label": value, "value": value} for value in values]
-
-
 _MAA_TASK_ORDER = [str(item["value"]) for item in MAA_TASK_OPTIONS]
 _MAA_TASK_FLAG_ORDER = [
     ("IfStartUp", "StartUp"),
@@ -232,8 +228,6 @@ class Config(BaseModel):
         default="请直接在脚本配置使用本插件",
         title="专项适配",
         description="请直接在脚本配置使用本插件",
-        min_length=2,
-        max_length=32,
         size="1/3"
     )
 
@@ -256,10 +250,16 @@ class MaaScriptEmulator(BaseModel):
         title="模拟器",
         ui_type="related-id",
         related_config="EmulatorConfig",
+        options_provider={"source": "emulator_options"},
     )
     Index: str = PluginField(
         "-",
         title="多开实例",
+        options_provider={
+            "source": "emulator_device_options",
+            "selected_field": "Emulator.Id",
+            "allow_custom": True,
+        },
         help="选择多开序号；若列表为空，可保持为“未选择”后由运行时自动处理。",
     )
 
@@ -268,7 +268,12 @@ class MaaScriptRun(BaseModel):
     TaskTransitionMethod: Literal["NoAction", "ExitGame", "ExitEmulator"] = PluginField(
         "ExitEmulator",
         title="任务切换方式",
-        options=_option_values(["NoAction", "ExitGame", "ExitEmulator"]),
+        options=["NoAction", "ExitGame", "ExitEmulator"],
+        option_labels={
+            "NoAction": "无操作",
+            "ExitGame": "重启游戏",
+            "ExitEmulator": "重启模拟器",
+        },
     )
     ProxyTimesLimit: int = PluginField(0, title="代理次数限制", ge=0, le=9999, step=1)
     RunTimesLimit: int = PluginField(3, title="运行次数限制", ge=1, le=9999, step=1)
@@ -367,9 +372,15 @@ class MaaUserInfo(BaseModel):
         PluginField(
             "Official",
             title="服务器",
-            options=_option_values(
-                ["Official", "Bilibili", "YoStarEN", "YoStarJP", "YoStarKR", "txwy"]
-            ),
+            options=["Official", "Bilibili", "YoStarEN", "YoStarJP", "YoStarKR", "txwy"],
+            option_labels={
+                "Official": "官服",
+                "Bilibili": "B服",
+                "YoStarEN": "国际服",
+                "YoStarJP": "日服",
+                "YoStarKR": "韩服",
+                "txwy": "繁中服",
+            },
         )
     )
     Status: bool = PluginField(True, title="启用用户")
