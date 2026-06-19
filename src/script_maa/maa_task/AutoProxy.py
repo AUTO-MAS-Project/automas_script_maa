@@ -32,7 +32,7 @@ from app.core import Config
 from app.models.task import TaskExecuteBase, ScriptItem, LogRecord
 from app.models.ConfigBase import MultipleConfig
 from app.models.emulator import DeviceInfo, DeviceBase
-from app.services import Notify, System
+from app.services import System
 from app.tools import skland_sign_in
 from app.utils import get_logger, LogMonitor, ProcessManager
 
@@ -97,36 +97,22 @@ class AutoProxyTask(TaskExecuteBase):
         ticker: str,
         timeout: int,
     ) -> None:
-        if self.notify_service is not None:
-            try:
-                if callable(getattr(self.notify_service, "send_payload", None)):
-                    result = await self.notify_service.send_payload(
-                        {
-                            "kind": "system",
-                            "title": title,
-                            "text": message,
-                            "ticker": ticker,
-                            "timeout": timeout,
-                        },
-                        channels=self.notify_channels,
-                    )
-                    if isinstance(result, dict) and any(bool(ok) for ok in result.values()):
-                        return
-                    return
-                if not callable(getattr(self.notify_service, "send_system", None)):
-                    raise AttributeError("notify service has no send_system method")
-                sent = await self.notify_service.send_system(
-                    title=title,
-                    message=message,
-                    ticker=ticker,
-                    timeout=timeout,
-                )
-                if sent:
-                    return
-            except Exception as exc:
-                logger.warning(f"notify 系统通知发送失败，将回退旧实现: {type(exc).__name__}: {exc}")
+        if self.notify_service is None:
+            return
 
-        await Notify.push_plyer(title, message, ticker, timeout)
+        try:
+            await self.notify_service.send_payload(
+                {
+                    "kind": "system",
+                    "title": title,
+                    "text": message,
+                    "ticker": ticker,
+                    "timeout": timeout,
+                },
+                channels=self.notify_channels,
+            )
+        except Exception as exc:
+            logger.warning(f"notify 系统通知发送失败: {type(exc).__name__}: {exc}")
 
     async def check(self) -> str:
 

@@ -48,30 +48,19 @@ async def _push_system_notification(
         return False
 
     try:
-        if callable(getattr(notify_service, "send_payload", None)):
-            result = await notify_service.send_payload(
-                {
-                    "kind": "system",
-                    "title": title,
-                    "text": message,
-                    "ticker": ticker,
-                    "timeout": timeout,
-                },
-                channels=channels,
-            )
-            return isinstance(result, dict) and any(bool(ok) for ok in result.values())
-        if callable(getattr(notify_service, "send_system", None)):
-            return bool(
-                await notify_service.send_system(
-                    title=title,
-                    message=message,
-                    ticker=ticker,
-                    timeout=timeout,
-                )
-            )
-        return False
+        result = await notify_service.send_payload(
+            {
+                "kind": "system",
+                "title": title,
+                "text": message,
+                "ticker": ticker,
+                "timeout": timeout,
+            },
+            channels=channels,
+        )
+        return isinstance(result, dict) and any(bool(ok) for ok in result.values())
     except Exception as exc:
-        logger.warning(f"notify 系统通知发送失败，将回退旧实现: {type(exc).__name__}: {exc}")
+        logger.warning(f"notify 系统通知发送失败: {type(exc).__name__}: {exc}")
         return False
 
 
