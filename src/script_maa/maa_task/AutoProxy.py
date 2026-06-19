@@ -97,14 +97,9 @@ class AutoProxyTask(TaskExecuteBase):
         ticker: str,
         timeout: int,
     ) -> None:
-        if self.notify_channels == []:
-            return
-
         if self.notify_service is not None:
             try:
-                if self.notify_channels is not None and callable(
-                    getattr(self.notify_service, "send_payload", None)
-                ):
+                if callable(getattr(self.notify_service, "send_payload", None)):
                     result = await self.notify_service.send_payload(
                         {
                             "kind": "system",
@@ -732,9 +727,6 @@ class AutoProxyTask(TaskExecuteBase):
         # 判断是否成功
         if_success = self.run_book["Annihilation"] and self.run_book["Routine"]
         success_symbol = "√" if if_success else "X"
-
-        if self.notify_channels == []:
-            return
 
         try:
             if if_six_star:

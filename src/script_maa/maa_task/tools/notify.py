@@ -39,8 +39,6 @@ async def _send_payload_with_notify(
     payload: dict[str, Any],
     channels: list[str] | None = None,
 ) -> bool:
-    if channels == []:
-        return True
     if notify_service is None or not callable(getattr(notify_service, "send_payload", None)):
         return False
 
@@ -60,16 +58,16 @@ async def _send_user_direct_with_notify(
     user_config: Any | None,
     channels: list[str] | None = None,
 ) -> None:
-    if channels == []:
-        return
     if notify_service is None or user_config is None:
         return
     if not user_config.get("Notify", "Enabled"):
         return
 
-    allowed = set(channels or [])
+    channel_selected = getattr(notify_service, "is_channel_selected", None)
+    if not callable(channel_selected):
+        return
 
-    if user_config.get("Notify", "IfSendMail") and (not allowed or "mail" in allowed):
+    if user_config.get("Notify", "IfSendMail") and channel_selected(channels, "mail"):
         to_address = user_config.get("Notify", "ToAddress")
         if to_address and callable(getattr(notify_service, "send_mail", None)):
             try:
@@ -84,7 +82,9 @@ async def _send_user_direct_with_notify(
         elif not to_address:
             logger.error("用户邮箱地址为空, 无法发送用户单独的邮件通知")
 
-    if user_config.get("Notify", "IfServerChan") and (not allowed or "serverchan" in allowed):
+    if user_config.get("Notify", "IfServerChan") and channel_selected(
+        channels, "serverchan"
+    ):
         send_key = user_config.get("Notify", "ServerChanKey")
         if send_key and callable(getattr(notify_service, "send_serverchan", None)):
             try:
@@ -132,9 +132,6 @@ async def push_notification(
     """通过所有渠道推送通知"""
 
     logger.info(f"开始推送通知, 模式: {mode}, 标题: {title}")
-
-    if notify_channels == []:
-        return
 
     if mode == "代理结果" and (
         Config.get("Notify", "SendTaskResultTime") == "任何时刻"

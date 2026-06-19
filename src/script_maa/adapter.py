@@ -23,33 +23,16 @@ from .constants import TASK_MODE_ZH
 logger = get_logger("MAA 专项适配")
 
 
-def _get_notify_service(runtime: ScriptAdapterRuntime) -> Any | None:
-    if runtime.plugin_context is None:
-        return None
-    return runtime.plugin_context.get("notify")
+def _read_notify_channels(script_config: Any | None) -> list[str]:
+    """Read the plugin-owned channel selection without interpreting it."""
 
-
-def _get_notify_channels(script_config: Any | None) -> list[str] | None:
     if script_config is None:
         return []
     try:
         raw_channels = script_config.get("Notify", "Channels")
     except Exception:
         return []
-    if not isinstance(raw_channels, list):
-        return []
-
-    channels: list[str] = []
-    seen: set[str] = set()
-    for item in raw_channels:
-        name = str(item or "").strip()
-        if not name or name in seen:
-            continue
-        if name == "all":
-            return None
-        seen.add(name)
-        channels.append(name)
-    return channels
+    return raw_channels if isinstance(raw_channels, list) else []
 
 
 async def _push_system_notification(
@@ -61,13 +44,11 @@ async def _push_system_notification(
     timeout: int,
     channels: list[str] | None = None,
 ) -> bool:
-    if channels == []:
-        return True
     if notify_service is None:
         return False
 
     try:
-        if channels is not None and callable(getattr(notify_service, "send_payload", None)):
+        if callable(getattr(notify_service, "send_payload", None)):
             result = await notify_service.send_payload(
                 {
                     "kind": "system",
@@ -234,11 +215,7 @@ class MaaAdapterHooks(ScriptAdapterHooks):
         temp_path = Path.cwd() / f"data/{runtime.script_info.script_id}/Temp"
         runtime.extra["maa_set_path"] = maa_set_path
         runtime.extra["temp_path"] = temp_path
-        emulator_service = (
-            runtime.plugin_context.get("emulator")
-            if runtime.plugin_context is not None
-            else None
-        )
+        emulator_service = runtime.get_service("emulator")
         if emulator_service is not None and callable(getattr(emulator_service, "get_instance", None)):
             runtime.extra["emulator_manager"] = await emulator_service.get_instance(
                 script_config.get("Emulator", "Id")
@@ -287,8 +264,8 @@ class MaaAdapterHooks(ScriptAdapterHooks):
             runtime.script_config,
             runtime.user_config,
             runtime.extra.get("emulator_manager"),
-            notify_service=_get_notify_service(runtime),
-            notify_channels=_get_notify_channels(runtime.script_config),
+            notify_service=runtime.get_service("notify"),
+            notify_channels=_read_notify_channels(runtime.script_config),
         )
 
     def run_manual_review(self, runtime: ScriptAdapterRuntime, user_index: int):
@@ -315,7 +292,6 @@ class MaaAdapterHooks(ScriptAdapterHooks):
 
     async def finalize(self, runtime: ScriptAdapterRuntime) -> None:
         from app.core.config import Config
-        from app.services.notification import Notify
         from .maa_task.tools.notify import push_notification
 
         if runtime.check_result != "Pass":
@@ -328,8 +304,8 @@ class MaaAdapterHooks(ScriptAdapterHooks):
             return
 
         logger.info("MAA 主任务已结束, 开始执行后续操作")
-        notify_service = _get_notify_service(runtime)
-        notify_channels = _get_notify_channels(script_config)
+        notify_service = runtime.get_service("notify")
+        notify_channels = _read_notify_channels(script_config)
         storage_script_config = runtime.get_storage_script_config()
         await storage_script_config.unlock()
         logger.success(f"已解锁脚本配置 {runtime.script_info.script_id}")
@@ -397,7 +373,7 @@ class MaaAdapterHooks(ScriptAdapterHooks):
                 f"已完成用户数: {len(over_user)}, "
                 f"未完成用户数: {len(error_user) + len(wait_user)}"
             )
-            system_sent = await _push_system_notification(
+            await _push_system_notification(
                 notify_service,
                 title=title.replace("报告", "已完成！"),
                 message=system_message,
@@ -405,13 +381,6 @@ class MaaAdapterHooks(ScriptAdapterHooks):
                 timeout=10,
                 channels=notify_channels,
             )
-            if not system_sent and notify_channels is None:
-                await Notify.push_plyer(
-                    title.replace("报告", "已完成！"),
-                    system_message,
-                    system_message,
-                    10,
-                )
             try:
                 await push_notification(
                     "代理结果",
