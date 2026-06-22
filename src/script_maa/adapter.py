@@ -26,6 +26,7 @@ logger = get_logger("MAA 专项适配")
 def _read_notify_channels(script_config: Any | None) -> list[str]:
     """Read the plugin-owned channel selection without interpreting it."""
 
+    # 读取脚本配置中选择的通知频道。
     if script_config is None:
         return []
     try:
@@ -44,6 +45,7 @@ async def _push_system_notification(
     timeout: int,
     channels: list[str] | None = None,
 ) -> bool:
+    # 通过 notify 服务发送系统通知。
     if notify_service is None:
         return False
 
@@ -65,6 +67,7 @@ async def _push_system_notification(
 
 
 def _build_infrast_plan_options(config_data: dict[str, Any]) -> list[dict[str, str]]:
+    # 从自定义基建配置生成排班选项。
     data_group = config_data.get("Data")
     if not isinstance(data_group, dict):
         return []
@@ -93,6 +96,7 @@ class MaaAdapterHooks(ScriptAdapterHooks):
         config_data: dict[str, Any],
         ctx: SchemaDecorationContext,
     ) -> dict[str, Any]:
+        # 根据用户模式动态调整表单字段状态。
         _ = ctx
 
         info_group = config_data.get("Info")
@@ -157,6 +161,7 @@ class MaaAdapterHooks(ScriptAdapterHooks):
         return schema
 
     async def check(self, runtime: ScriptAdapterRuntime) -> str:
+        # 校验任务模式与脚本配置是否可运行。
         if runtime.mode not in ("AutoProxy", "ManualReview", "ScriptConfig"):
             return "不支持的任务模式，请检查任务配置！"
 
@@ -187,9 +192,11 @@ class MaaAdapterHooks(ScriptAdapterHooks):
         return "Pass"
 
     async def prepare(self, runtime: ScriptAdapterRuntime) -> None:
+        # 锁定脚本配置。
         storage_script_config = runtime.get_storage_script_config()
         await storage_script_config.lock()
 
+        # 构建运行时脚本配置与用户配置。
         script_config = runtime.script_config or await runtime.build_script_model()
         runtime.script_config = script_config
         provider = runtime._resolve_provider()
@@ -200,26 +207,25 @@ class MaaAdapterHooks(ScriptAdapterHooks):
             runtime.user_config.data[uid] = user_model
         logger.success(f"{runtime.script_info.script_id} 已锁定, MAA 配置提取完成")
 
+        # 记录配置目录并获取模拟器实例。
         maa_set_path = Path(script_config.get("Info", "Path")) / "config"
         temp_path = Path.cwd() / f"data/{runtime.script_info.script_id}/Temp"
         runtime.extra["maa_set_path"] = maa_set_path
         runtime.extra["temp_path"] = temp_path
         emulator_service = runtime.get_service("emulator")
-        if emulator_service is not None and callable(getattr(emulator_service, "get_instance", None)):
-            runtime.extra["emulator_manager"] = await emulator_service.get_instance(
-                script_config.get("Emulator", "Id")
-            )
-        else:
-            from app.core.emulator_manager import EmulatorManager
+        get_emulator_instance = getattr(emulator_service, "get_instance", None)
+        if not callable(get_emulator_instance):
+            raise RuntimeError("emulator 服务不可用或未提供 get_instance()")
+        runtime.extra["emulator_manager"] = await get_emulator_instance(
+            script_config.get("Emulator", "Id")
+        )
 
-            runtime.extra["emulator_manager"] = await EmulatorManager.get_emulator_instance(
-                script_config.get("Emulator", "Id")
-            )
-
+        # 备份 MAA 原始配置。
         temp_path.mkdir(parents=True, exist_ok=True)
         if maa_set_path.exists():
             shutil.copytree(maa_set_path, temp_path, dirs_exist_ok=True)
 
+        # 构建本次任务需要执行的用户列表。
         if runtime.mode == "ScriptConfig":
             runtime.script_info.user_list = [
                 UserItem(
@@ -245,6 +251,7 @@ class MaaAdapterHooks(ScriptAdapterHooks):
         )
 
     def run_auto_proxy(self, runtime: ScriptAdapterRuntime, user_index: int):
+        # 创建自动代理任务。
         from .maa_task.AutoProxy import AutoProxyTask
 
         _ = user_index
@@ -258,6 +265,7 @@ class MaaAdapterHooks(ScriptAdapterHooks):
         )
 
     def run_manual_review(self, runtime: ScriptAdapterRuntime, user_index: int):
+        # 创建人工排查任务。
         from .maa_task.ManualReview import ManualReviewTask
 
         _ = user_index
@@ -269,6 +277,7 @@ class MaaAdapterHooks(ScriptAdapterHooks):
         )
 
     def run_script_config(self, runtime: ScriptAdapterRuntime, user_index: int):
+        # 创建脚本配置任务。
         from .maa_task.ScriptConfig import ScriptConfigTask
 
         _ = user_index
@@ -280,6 +289,7 @@ class MaaAdapterHooks(ScriptAdapterHooks):
         )
 
     async def finalize(self, runtime: ScriptAdapterRuntime) -> None:
+        # 执行任务结束后的统一收尾。
         from app.core.config import Config
         from .maa_task.tools.notify import push_notification
 
@@ -292,6 +302,7 @@ class MaaAdapterHooks(ScriptAdapterHooks):
             runtime.script_info.status = "异常"
             return
 
+        # 解锁脚本配置并读取通知设置。
         logger.info("MAA 主任务已结束, 开始执行后续操作")
         notify_service = runtime.get_service("notify")
         notify_channels = _read_notify_channels(script_config)
@@ -300,6 +311,7 @@ class MaaAdapterHooks(ScriptAdapterHooks):
         logger.success(f"已解锁脚本配置 {runtime.script_info.script_id}")
 
         if runtime.mode in ("AutoProxy", "ManualReview"):
+            # 关闭模拟器并写回用户运行数据。
             emulator_manager = runtime.extra.get("emulator_manager")
             if emulator_manager is not None:
                 await emulator_manager.close(script_config.get("Emulator", "Index"))
@@ -334,6 +346,7 @@ class MaaAdapterHooks(ScriptAdapterHooks):
                     )
                     break
 
+            # 汇总用户执行结果并发送任务报告。
             error_user = [
                 user.name for user in runtime.script_info.user_list if user.status == "异常"
             ]
@@ -387,6 +400,7 @@ class MaaAdapterHooks(ScriptAdapterHooks):
                     data={"Error": f"推送代理结果时出现异常: {error}"},
                 )
 
+        # 恢复 MAA 原始配置并清理临时目录。
         maa_set_path: Path | None = runtime.extra.get("maa_set_path")
         temp_path: Path | None = runtime.extra.get("temp_path")
         if maa_set_path is not None and temp_path is not None:
@@ -398,6 +412,7 @@ class MaaAdapterHooks(ScriptAdapterHooks):
         runtime.script_info.status = "完成"
 
     async def on_crash(self, runtime: ScriptAdapterRuntime, error: Exception) -> None:
+        # 标记异常状态并上报错误信息。
         from app.core.config import Config
 
         runtime.script_info.status = "异常"

@@ -24,9 +24,11 @@ SCRIPT_TYPE_BINDINGS = [
 class Plugin(ScriptAdapterPlugin):
     """把 MAA 适配包注册为统一脚本适配插件。"""
 
-    wants = ["notify", "emulator"]
+    needs = ["emulator"]
+    wants = ["notify"]
 
     def build_script_adapters(self) -> list[ScriptAdapterDefinition]:
+        # 注册 MAA 脚本类型及其运行时能力。
         return [
             ScriptAdapterDefinition(
                 type_key="MAA",

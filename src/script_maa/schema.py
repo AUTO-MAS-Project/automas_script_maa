@@ -27,6 +27,7 @@ _MAA_TASK_FLAG_ORDER = [
 
 
 def _normalize_enabled_tasks(value: Any) -> list[str]:
+    # 按预定义顺序规范化启用任务列表。
     if not isinstance(value, list):
         return []
 
@@ -39,6 +40,7 @@ def _normalize_enabled_tasks(value: Any) -> list[str]:
 
 
 def _enabled_tasks_from_legacy_flags(data: dict[str, Any]) -> list[str]:
+    # 将旧版布尔任务开关转换为任务列表。
     normalized: list[str] = []
     for legacy_key, task in _MAA_TASK_FLAG_ORDER:
         if data.get(legacy_key) is True:
@@ -47,11 +49,13 @@ def _enabled_tasks_from_legacy_flags(data: dict[str, Any]) -> list[str]:
 
 
 def _is_task_enabled(config: Any, task: str) -> bool:
+    # 判断指定任务是否已启用。
     tasks = _normalize_enabled_tasks(config.get("Task", "EnabledTasks"))
     return task in tasks
 
 
 def _get_stage_zh(stage: str) -> str:
+    # 将关卡代码转换为简洁中文名称。
     for stage_info in RESOURCE_STAGE_INFO:
         if stage_info.get("value") == stage:
             return (
@@ -66,6 +70,7 @@ def _get_stage_zh(stage: str) -> str:
 
 
 def _build_infrast_name(config: Any) -> str:
+    # 生成自定义基建方案的展示名称。
     if config.get("Info", "InfrastMode") != "Custom":
         return "未使用自定义基建模式"
 
@@ -83,6 +88,7 @@ def _build_infrast_name(config: Any) -> str:
 
 
 def _build_infrast_index(config: Any) -> str:
+    # 根据当前时间解析生效的基建排班索引。
     if config.get("Info", "InfrastMode") != "Custom":
         return "-1"
 
@@ -105,6 +111,7 @@ def _build_infrast_index(config: Any) -> str:
 def _build_user_tags(config: Any) -> str:
     """生成 MAA 用户标签列表。"""
 
+    # 汇总用户状态并生成前端标签数据。
     tags: list[dict[str, str]] = []
 
     if not config.get("Data", "IfPassCheck"):
@@ -524,6 +531,7 @@ class MaaUserTask(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def _upgrade_legacy_task_flags(cls, value: Any) -> Any:
+        # 兼容旧版任务开关并转换为有序任务列表。
         if not isinstance(value, dict):
             return value
 

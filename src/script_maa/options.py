@@ -13,6 +13,7 @@ async def resolve_plan_combox(
     config_data: dict[str, Any],
     ctx: SchemaOptionsProviderContext,
 ) -> list[dict[str, Any]]:
+    # 构建固定模式与计划表选项。
     _ = options_provider, field_schema, config_data
 
     data = [{"label": "固定", "value": "Fixed"}]
@@ -32,6 +33,7 @@ async def resolve_stage_info(
     config_data: dict[str, Any],
     ctx: SchemaOptionsProviderContext,
 ) -> list[dict[str, Any]]:
+    # 获取当前可用的关卡选项。
     _ = field_schema, config_data, ctx
 
     from app.core import Config as RuntimeConfig
@@ -57,6 +59,7 @@ async def resolve_notification_channels(
     config_data: dict[str, Any],
     ctx: SchemaOptionsProviderContext,
 ) -> list[dict[str, Any]]:
+    # 获取 notify 服务已注册的通知频道。
     _ = options_provider, field_schema, config_data, ctx
 
     data: list[dict[str, Any]] = [{"label": "全部通知频道", "value": "all"}]
